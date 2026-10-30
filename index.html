@@ -1,0 +1,1196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#e0661b">
+<meta name="description" content="Mark up and measure PDF drawings: clouds, text, stamps, length, area and count. Works offline.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PDF Markup">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>PDF Markup</title>
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#ffffff; --panel2:#f0f2f5; --text:#1b1f24; --muted:#667085; --border:#dde1e7;
+  --accent:#e0661b; --accent-soft:#fde9dc; --stage:#e3e6ea; --sel:#2563eb; --row:#f6f7f9;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111418; --panel:#181c21; --panel2:#1f242a; --text:#e6e8eb; --muted:#8b95a3; --border:#2b313a;
+    --accent:#ff8a3d; --accent-soft:#3a2415; --stage:#0b0d10; --sel:#60a5fa; --row:#20252c; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111418; --panel:#181c21; --panel2:#1f242a; --text:#e6e8eb; --muted:#8b95a3; --border:#2b313a;
+  --accent:#ff8a3d; --accent-soft:#3a2415; --stage:#0b0d10; --sel:#60a5fa; --row:#20252c; color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:13px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,select,input,textarea{font:inherit;color:inherit}
+button{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:4px 9px;cursor:pointer;white-space:nowrap}
+button:hover{border-color:var(--muted)}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+select,input[type=text],input[type=number]{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:3px 6px;min-width:0}
+.app{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;height:100vh}
+header{display:flex;align-items:center;gap:7px;padding:7px 12px;background:var(--panel);border-bottom:1px solid var(--border);flex-wrap:wrap}
+header h1{font-size:15px;margin:0 6px 0 0;font-weight:700}
+header h1 span{color:var(--accent)}
+header .grow{flex:1}
+.home{color:var(--muted);text-decoration:none;font-weight:600;white-space:nowrap}
+.muted{color:var(--muted)}
+.split{position:relative;display:inline-flex}
+.split>button:first-child{border-top-right-radius:0;border-bottom-right-radius:0}
+.split>button.more{border-top-left-radius:0;border-bottom-left-radius:0;border-left:none;padding:4px 6px}
+.menu{position:absolute;right:0;top:calc(100% + 4px);z-index:30;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.18);padding:5px;width:290px;display:grid;gap:3px}
+.menu button{display:grid;gap:2px;text-align:left;white-space:normal;background:none;border:1px solid transparent;padding:7px 9px}
+.menu button:hover{background:var(--panel2);border-color:var(--border)}
+.menu small{color:var(--muted);font-size:11.5px}
+/* toolbar */
+.tbar{display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--panel);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.tools{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+.tools button{border:none;border-radius:0;background:var(--panel);padding:5px 6px;line-height:0}
+.tools button svg{width:18px;height:18px}
+.tools button.on{background:var(--accent);color:#fff}
+.tools .gap{width:1px;background:var(--border)}
+.sep{width:1px;height:22px;background:var(--border);margin:0 2px}
+.sw{display:inline-flex;gap:4px;align-items:center}
+.sw button{width:18px;height:18px;border-radius:50%;padding:0;border:2px solid transparent}
+.sw button.on{outline:2px solid var(--text);outline-offset:1px}
+.sw input[type=color]{width:24px;height:22px;padding:0;border:none;background:none}
+label.chk{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
+.ico{padding:3px 8px;font-size:14px;line-height:1}
+/* main */
+.main{display:grid;grid-template-columns:170px minmax(0,1fr);min-height:0}
+#thumbs{background:var(--panel);border-right:1px solid var(--border);overflow:auto;padding:8px;display:flex;flex-direction:column;gap:10px}
+.th{position:relative;border:2px solid transparent;border-radius:6px;padding:3px;cursor:pointer;background:var(--panel2)}
+.th.on{border-color:var(--accent)}
+.th canvas{display:block;width:100%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.th .n{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;margin-top:2px}
+.th .acts{position:absolute;top:6px;right:6px;display:none;gap:3px}
+.th:hover .acts{display:flex}
+.th .acts button{padding:0 5px;font-size:12px;background:var(--panel)}
+.th .dot{display:inline-block;min-width:16px;padding:0 4px;border-radius:8px;background:var(--accent);color:#fff;font-size:10px;text-align:center}
+.th.dropb{box-shadow:0 -3px 0 var(--sel)}
+.th.dropa{box-shadow:0 3px 0 var(--sel)}
+#stage{overflow:auto;background:var(--stage);position:relative;min-height:0}
+#stage.space,#stage.space *{cursor:grab!important}
+#stage.panning,#stage.panning *{cursor:grabbing!important}
+#pages{display:flex;flex-direction:column;align-items:safe center;gap:18px;padding:18px;width:max-content;min-width:100%}
+.pg{position:relative;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.2);flex:none}
+.pg.active{outline:2px solid var(--accent);outline-offset:3px}
+.pg canvas{position:absolute;inset:0;width:100%;height:100%}
+.pg svg{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+.pg .lbl{position:absolute;top:-16px;left:0;font-size:11px;color:var(--muted)}
+.drawing svg{cursor:crosshair}
+svg [data-m]{cursor:move}
+.drawing svg [data-m]{cursor:crosshair}
+.drop{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;text-align:center;color:var(--muted)}
+.drop .box{border:2px dashed var(--border);border-radius:14px;padding:36px 44px;background:var(--panel);max-width:560px}
+.drop h2{margin:0 0 6px;color:var(--text);font-size:18px}
+.dragging .drop .box{border-color:var(--accent);background:var(--accent-soft)}
+.ted{position:absolute;margin:0;padding:0;border:1px dashed var(--accent);background:rgba(255,255,255,.96);color:#111;outline:none;resize:none;overflow:hidden;white-space:pre;min-width:3em;font-family:Arial,Helvetica,sans-serif;line-height:1.25;z-index:5}
+/* markups list */
+.listwrap{background:var(--panel);border-top:1px solid var(--border);display:flex;flex-direction:column;height:var(--list-h,210px);min-height:0}
+.listwrap.closed{height:auto}
+.listwrap.closed .lt{display:none}
+.lhead{display:flex;align-items:center;gap:8px;padding:5px 10px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.lhead b{font-size:13px}
+.lhead .grow{flex:1}
+.resizer{height:5px;cursor:row-resize;background:var(--border)}
+.resizer:hover{background:var(--accent)}
+.lt{overflow:auto;flex:1;min-height:0}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th,td{padding:3px 7px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:var(--panel2);font-weight:600;color:var(--muted);font-size:11.5px;z-index:1}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--row)}
+tbody tr.on{background:var(--accent-soft)}
+td input,td select{border-color:transparent;background:transparent;padding:1px 4px;width:100%}
+td input:hover,td select:hover,td input:focus{border-color:var(--border)}
+td .sw0{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;margin-right:5px}
+.st-Accepted{color:#2f8f5b;font-weight:600}.st-Rejected{color:#c2410c;font-weight:600}.st-Completed{color:#2563eb;font-weight:600}
+/* find */
+.find{position:absolute;right:16px;top:8px;z-index:6;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:8px;width:300px}
+.find .res{max-height:260px;overflow:auto;margin-top:6px;display:grid;gap:2px}
+.find .res button{text-align:left;white-space:normal;font-size:12px;background:none;border-color:transparent}
+.find .res button:hover{background:var(--panel2)}
+.busy{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;color:#fff;font-weight:600;z-index:40}
+.toast{position:fixed;right:16px;bottom:16px;background:var(--text);color:var(--bg);padding:8px 14px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;max-width:70vw}
+.toast.show{opacity:1}
+@media (max-width:820px){ .main{grid-template-columns:1fr} #thumbs{display:none} }
+/* touch screens: the page area handles finger panning and pinch zoom itself; bigger targets */
+#stage{touch-action:none}
+@media (pointer:coarse){
+  button{padding:7px 11px}
+  .ico{padding:6px 11px;font-size:17px}
+  .tools button{padding:9px}
+  .tools button svg{width:22px;height:22px}
+  .sw button{width:28px;height:28px}
+  .split>button.more{padding:7px 10px}
+  select,input[type=text],input[type=number]{font-size:16px;padding:6px 8px}
+  .th .acts{display:flex}
+}
+header{padding-top:max(8px, env(safe-area-inset-top));padding-left:max(16px, env(safe-area-inset-left));padding-right:max(16px, env(safe-area-inset-right))}
+body{padding-bottom:env(safe-area-inset-bottom)}
+#installBtn{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+</style>
+<script src="lib/pdf.min.js"></script>
+</head>
+<body>
+<div class="app">
+<header>
+  <h1>PDF <span>Markup</span></h1>
+  <button class="primary" id="openBtn" title="Open PDFs (replaces what's open)">Open…</button>
+  <button id="addBtn" title="Insert PDFs after the current page" disabled>Insert PDF…</button>
+  <span class="split">
+    <button id="clearBtn" title="Clear markups or close the PDF" disabled>Clear ▾</button>
+    <div class="menu" id="clearMenu" style="left:0;right:auto" hidden>
+      <button data-clear="marks"><b>Clear all markups</b><small>Removes every markup and measurement, keeps the PDF open. Undo (Ctrl+Z) brings them back.</small></button>
+      <button data-clear="all"><b>Close PDF and clear everything</b><small>Closes the document and forgets the saved session. Save first if you need it.</small></button>
+    </div>
+  </span>
+  <input type="file" id="fileIn" accept=".pdf,application/pdf" multiple hidden>
+  <span class="muted" id="docName"></span>
+  <span class="grow"></span>
+  <label class="muted" title="Your name, saved with each markup">Author <input type="text" id="author" style="width:110px" placeholder="Your name"></label>
+  <button id="findBtn" title="Find text (Ctrl+F)" disabled>Find</button>
+  <span class="split">
+    <button id="saveBtn" class="primary" title="Save a PDF with your markups as editable annotations" disabled>Save PDF</button><button class="more" id="saveMore" title="More save options" disabled>▾</button>
+    <div class="menu" id="saveMenu" hidden>
+      <button data-save="edit"><b>Editable markups</b><small>Markups stay as Bluebeam / Acrobat markups. Reopen it here to keep editing them.</small></button>
+      <button data-save="flat"><b>Flattened</b><small>Markups become part of the page and can't be changed. Best for issuing.</small></button>
+    </div>
+  </span>
+  <button id="installBtn" hidden>Install app</button>
+  <button id="themeBtn" title="Light / dark">◐</button>
+</header>
+
+<div class="tbar">
+  <div class="tools" id="tools"></div>
+  <span class="sep"></span>
+  <div class="sw" id="colors"></div>
+  <select id="wSel" title="Line width"></select>
+  <select id="fsSel" title="Text size">
+    <option value="8">8 pt</option><option value="10">10 pt</option><option value="12">12 pt</option><option value="14">14 pt</option><option value="18">18 pt</option><option value="24">24 pt</option>
+  </select>
+  <label class="chk" title="Fill shapes and areas"><input type="checkbox" id="fillChk"> Fill</label>
+  <select id="stampSel" title="Stamp text"></select>
+  <span class="sep"></span>
+  <label class="muted" title="Scale of the current page, for measurements">Scale <select id="scaleSel"></select></label>
+  <button id="scaleAll" title="Use this scale on every page">All pages</button>
+  <span class="sep"></span>
+  <button class="ico" id="undoBtn" title="Undo (Ctrl+Z)">↶</button>
+  <button class="ico" id="redoBtn" title="Redo (Ctrl+Y)">↷</button>
+  <button class="ico" id="delBtn" title="Delete selected (Del)">🗑</button>
+  <span class="sep"></span>
+  <button class="ico" id="zOut" title="Zoom out (Ctrl −)">−</button>
+  <select id="zSel" title="Zoom"></select>
+  <button class="ico" id="zIn" title="Zoom in (Ctrl +)">+</button>
+  <button id="fitW" title="Fit width (Ctrl 0)">Width</button>
+  <button id="fitP" title="Fit page">Page</button>
+  <span class="muted">Page <input type="number" id="pgNum" min="1" style="width:52px"> / <span id="pgCount">0</span></span>
+</div>
+
+<div class="main">
+  <aside id="thumbs"></aside>
+  <section id="stage">
+    <div id="pages"></div>
+    <div class="drop" id="drop"><div class="box">
+      <h2>Drop PDFs here</h2>
+      <div>Open drawings to mark them up, measure them, and keep a list of every markup. Drop several to combine them. Files stay on this PC.</div>
+    </div></div>
+    <div class="find" id="findBox" hidden>
+      <div style="display:flex;gap:6px"><input type="text" id="findIn" placeholder="Find text…" style="flex:1"><button id="findClose">✕</button></div>
+      <div class="muted" id="findInfo" style="margin-top:4px;font-size:12px"></div>
+      <div class="res" id="findRes"></div>
+    </div>
+  </section>
+</div>
+
+<div class="listwrap" id="listwrap">
+  <div class="resizer" id="lresize"></div>
+  <div class="lhead">
+    <button class="ico" id="listToggle" title="Show / hide the markups list">▾</button>
+    <b>Markups</b><span class="muted" id="mCount"></span>
+    <span class="grow"></span>
+    <select id="fType" title="Filter by type"><option value="">All types</option></select>
+    <select id="fStatus" title="Filter by status"><option value="">Any status</option><option>Open</option><option>Accepted</option><option>Rejected</option><option>Completed</option></select>
+    <input type="text" id="fText" placeholder="Filter…" style="width:120px">
+    <button id="xlsBtn" title="Markups and measurements to Excel">Export Excel</button>
+  </div>
+  <div class="lt" id="lt"></div>
+</div>
+</div>
+<div class="busy" id="busy"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js';
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+const U = 72 / 25.4; // points per mm: page coordinates are PDF points (1/72 in)
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const r3 = v => Math.round(v * 1000) / 1000;
+const uid = () => Math.random().toString(36).slice(2, 10);
+const tick = () => new Promise(r => setTimeout(r, 15));
+let tt; function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('show'), 3000); }
+function busy(t) { $('busy').textContent = t || ''; $('busy').style.display = t ? 'flex' : 'none'; }
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Could not load a library (needs internet the first time)')); document.head.appendChild(s); }); }
+const ensurePdfLib = async () => { if (!window.PDFLib) await loadScript('lib/pdf-lib.min.js'); };
+
+/* =================== state ===================
+   sources: the PDFs opened (bytes kept so the output can copy their pages).
+   pages:   the document as shown, in order: { id, src, idx (page in source), rot (extra rotation), w0, h0, cal, marks }.
+   Markup coordinates are in the page's own view at scale 1 (points, y down) before any extra rotation. */
+const sources = new Map();
+let pages = [], active = 0, sel = null, tool = 'select', drag = null, drawing = null;
+const S = Object.assign({ c: '#d32f2f', w: 1.5, fs: 10, fill: false, mc: '#1e63c6', hl: '#ffe600', stamp: 'APPROVED' }, store.get('pm:style', {}));
+const COLORS = ['#d32f2f', '#1e63c6', '#2e7d32', '#111111', '#ef6c00', '#c2185b', '#ffe600'];
+const STAMPS = ['APPROVED', 'APPROVED AS NOTED', 'REVIEWED', 'REVISE & RESUBMIT', 'NOT APPROVED', 'FOR INFORMATION', 'VOID', 'Custom…'];
+const SCALES = [1, 5, 10, 20, 25, 50, 75, 100, 125, 150, 200, 250, 500, 1000];
+const STATUSES = ['', 'Open', 'Accepted', 'Rejected', 'Completed'];
+const ICON = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const TOOLS = [
+  ['select', 'Select', 'V', '<path d="M6 3l12 9-5.5 1.2L15 19l-2.5 1.2-2.6-5.8L6 18z"/>'],
+  ['pan', 'Pan (or hold Space)', 'X', '<path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 10V4.5a1.5 1.5 0 0 1 3 0V11M14 10.5V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1a6 6 0 0 1-4.6-2.2L3 14.5a1.5 1.5 0 0 1 2.3-1.9L8 15"/>'],
+  null,
+  ['pen', 'Pen', 'P', '<path d="M4 20l1.2-4.4L16 4.8l3.2 3.2L8.4 18.8z"/><path d="M14 7l3 3"/>'],
+  ['hl', 'Highlighter', 'H', '<path d="M4 20h7"/><path d="M8 16l-1.5 2.5h4L12 17"/><path d="M8 16l8-12 4 3-8 11z"/>'],
+  ['line', 'Line', 'L', '<path d="M4 20L20 4"/>'],
+  ['arrow', 'Arrow', 'A', '<path d="M4 20L19 5"/><path d="M11 5h8v8"/>'],
+  ['rect', 'Rectangle', 'R', '<rect x="4" y="6" width="16" height="12" rx="1"/>'],
+  ['ellipse', 'Ellipse', 'E', '<ellipse cx="12" cy="12" rx="9" ry="6.5"/>'],
+  ['cloud', 'Cloud', 'C', '<path d="M7 18a3 3 0 0 1-.6-5.9A4.5 4.5 0 0 1 15 9a3.5 3.5 0 0 1 3.5 4A2.6 2.6 0 0 1 18 18z"/>'],
+  ['text', 'Text', 'T', '<path d="M5 7V4h14v3M12 4v16M9 20h6"/>'],
+  ['callout', 'Callout', 'Q', '<rect x="10" y="3" width="11" height="8" rx="1"/><path d="M3 21l7-10"/><path d="M3 21l1-4M3 21l4-1"/>'],
+  ['stamp', 'Stamp', 'S', '<rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 12h10"/>'],
+  null,
+  ['len', 'Length (click points, double-click to finish)', 'M', '<path d="M3 17l6-8 6 5 6-8"/><path d="M3 14v6M21 3v6"/>'],
+  ['area', 'Area (click corners, double-click to finish)', 'G', '<path d="M4 18l3-12 10 2 3 10z"/><path d="M8 13h8" stroke-dasharray="2 2"/>'],
+  ['count', 'Count (click each item, Enter to finish)', 'N', '<circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="9" r="2.5"/><circle cx="10" cy="17" r="2.5"/>'],
+  ['cal', 'Calibrate (click two points a known distance apart)', 'K', '<path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/>'],
+];
+const NAMES = { pen: 'Pen', hl: 'Highlight', line: 'Line', arrow: 'Arrow', rect: 'Rectangle', ellipse: 'Ellipse', cloud: 'Cloud', text: 'Text', callout: 'Callout', stamp: 'Stamp', len: 'Length', area: 'Area', count: 'Count' };
+const MEASURE = ['len', 'area', 'count'];
+
+/* =================== geometry (page points, y down) =================== */
+const mctx = document.createElement('canvas').getContext('2d');
+function tw(s, fs, bold) { mctx.font = `${bold ? 'bold ' : ''}100px Arial, Helvetica, sans-serif`; return mctx.measureText(s).width / 100 * fs; }
+const box2 = m => { const [[a, b], [c, d]] = m.pts; return { x: Math.min(a, c), y: Math.min(b, d), w: Math.abs(c - a), h: Math.abs(d - b) }; };
+function textBlock(m) { const lines = (m.text || '').split('\n'), lh = m.fs * 1.25; return { lines, lh, w: Math.max(m.fs, ...lines.map(l => tw(l, m.fs))), h: lines.length * lh }; }
+function calloutBox(m) {
+  const t = textBlock(m), pad = m.fs * 0.4, bw = t.w + 2 * pad, bh = t.h + 2 * pad - 0.2 * m.fs, [tip, at] = m.pts;
+  return { t, pad, bx: at[0] >= tip[0] ? at[0] : at[0] - bw, by: at[1] - bh / 2, bw, bh };
+}
+function cloudPts(m) {
+  const { x, y, w, h } = box2(m), out = [];
+  if (w < 1 || h < 1) return [[x, y], [x + w, y + h]];
+  const arc = Math.max(2 * U, Math.min(6 * U, Math.min(w, h) / 2));
+  const cs = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+  for (let e = 0; e < 4; e++) {
+    const [x0, y0] = cs[e], [x1, y1] = cs[(e + 1) % 4], L = Math.hypot(x1 - x0, y1 - y0);
+    const n = Math.max(1, Math.round(L / arc)), dx = (x1 - x0) / L, dy = (y1 - y0) / L, r = L / n / 2;
+    for (let i = 0; i < n; i++) {
+      const mx = x0 + dx * r * (2 * i + 1), my = y0 + dy * r * (2 * i + 1);
+      for (let s = i ? 1 : 0; s <= 10; s++) { const th = Math.PI * s / 10; out.push([mx - dx * r * Math.cos(th) + dy * r * Math.sin(th), my - dy * r * Math.cos(th) - dx * r * Math.sin(th)]); }
+    }
+  }
+  return out;
+}
+function arrowHead(p0, p1, w) {
+  const L = Math.max(2.2 * U, w * 6), d = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) || 1, ux = (p1[0] - p0[0]) / d, uy = (p1[1] - p0[1]) / d, hw = L * 0.36;
+  return { tri: [p1, [p1[0] - ux * L - uy * hw, p1[1] - uy * L + ux * hw], [p1[0] - ux * L + uy * hw, p1[1] - uy * L - ux * hw]], end: [p1[0] - ux * L * 0.7, p1[1] - uy * L * 0.7] };
+}
+function stampLayout(m) {
+  const big = m.fs * 1.7, small = m.fs * 0.8, pad = m.fs * 0.6, sub = m.sub || '';
+  const w = Math.max(tw(m.text, big, 1), tw(sub, small)) + pad * 2, h = big * 1.05 + (sub ? small * 1.4 : 0) + pad * 1.4;
+  const [x, y] = m.pts[0];
+  return { x, y, w, h, big, small, pad, sub, tx: x + w / 2, ty: y + pad * 0.7 + big * 0.85, sy: y + pad * 0.7 + big * 1.05 + small * 1.05 };
+}
+const poly = pts => pts.map((p, i) => (i ? 'L' : 'M') + r3(p[0]) + ' ' + r3(p[1])).join('');
+// measurements
+const pgOf = m => pages.find(p => p.marks.includes(m));
+function calOf(pg) { return pg && pg.cal || { f: 25.4 / 72, label: '1:1' }; } // f = real mm per page point
+const segLen = pts => { let L = 0; for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return L; };
+const polyArea = pts => { let a = 0; for (let i = 0; i < pts.length; i++) { const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % pts.length]; a += x0 * y1 - x1 * y0; } return Math.abs(a) / 2; };
+function centroid(pts) { const n = pts.length; return [pts.reduce((s, p) => s + p[0], 0) / n, pts.reduce((s, p) => s + p[1], 0) / n]; }
+const fmtMM = v => Math.round(v).toLocaleString('en-AU') + ' mm';
+const fmtM2 = v => (v / 1e6).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' m²';
+function measure(m, pg) {
+  const f = calOf(pg || pgOf(m)).f;
+  if (m.t === 'len') { const L = segLen(m.pts) * f; return { value: L, label: fmtMM(L) }; }
+  if (m.t === 'area') { const A = polyArea(m.pts) * f * f, P = segLen([...m.pts, m.pts[0]]) * f; return { value: A, label: fmtM2(A), perim: P, sub: 'Perimeter ' + fmtMM(P) }; }
+  if (m.t === 'count') return { value: m.pts.length, label: m.pts.length + ' item' + (m.pts.length === 1 ? '' : 's') };
+  return null;
+}
+// label along the longest segment of a length run, kept readable
+function lenLabel(m, pg) {
+  let best = 0, bi = 1;
+  for (let i = 1; i < m.pts.length; i++) { const L = Math.hypot(m.pts[i][0] - m.pts[i - 1][0], m.pts[i][1] - m.pts[i - 1][1]); if (L > best) { best = L; bi = i; } }
+  const p0 = m.pts[bi - 1], p1 = m.pts[bi];
+  let deg = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]) * 180 / Math.PI; if (deg > 90) deg -= 180; if (deg <= -90) deg += 180;
+  const rad = deg * Math.PI / 180, ux = Math.cos(rad), uy = Math.sin(rad), off = m.fs * 0.4 + m.w;
+  return { label: measure(m, pg).label, deg, ux, uy, cx: (p0[0] + p1[0]) / 2 + uy * off, cy: (p0[1] + p1[1]) / 2 - ux * off };
+}
+function ticks(m) { // 45° end ticks on a length run
+  const t = 2 * U + m.w, out = [];
+  for (const [a, b] of [[0, 1], [m.pts.length - 1, m.pts.length - 2]]) {
+    const p = m.pts[a], q = m.pts[b] || p, d = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1, ux = (q[0] - p[0]) / d, uy = (q[1] - p[1]) / d, k = t * 0.7071;
+    out.push([p[0] - (ux - uy) * k, p[1] - (uy + ux) * k, p[0] + (ux - uy) * k, p[1] + (uy + ux) * k]);
+  }
+  return out;
+}
+const countR = m => 4 + m.w;
+function markBBox(m) {
+  if (m.t === 'text') { const t = textBlock(m); return { x: m.pts[0][0], y: m.pts[0][1], w: t.w, h: t.h }; }
+  if (m.t === 'stamp') { const L = stampLayout(m); return { x: L.x, y: L.y, w: L.w, h: L.h }; }
+  const xs = m.pts.map(p => p[0]), ys = m.pts.map(p => p[1]);
+  if (m.t === 'callout') { const b = calloutBox(m); xs.push(b.bx, b.bx + b.bw); ys.push(b.by, b.by + b.bh); }
+  let pad = m.w / 2 + (m.t === 'count' ? countR(m) : 0) + (m.t === 'cloud' ? Math.min(6 * U, Math.min(box2(m).w, box2(m).h) / 2) : 0);
+  if (m.t === 'len') pad += m.fs * 1.6;
+  const x = Math.min(...xs) - pad, y = Math.min(...ys) - pad;
+  return { x, y, w: Math.max(...xs) + pad - x, h: Math.max(...ys) + pad - y };
+}
+
+/* =================== markup drawing (SVG, page points) =================== */
+function textSVG(lines, x, top, fs, lh, c, extra = '') {
+  return `<text font-family="Arial, Helvetica, sans-serif" font-size="${r3(fs)}" fill="${c}" xml:space="preserve"${extra}>` + lines.map((l, i) => `<tspan x="${r3(x)}" y="${r3(top + fs * 0.8 + i * lh)}">${esc(l)}</tspan>`).join('') + '</text>';
+}
+function markSVG(m, pg, hit) {
+  const c = m.c, w = r3(m.w), st = `stroke="${c}" stroke-width="${w}" stroke-linecap="${m.t === 'hl' ? 'butt' : 'round'}" stroke-linejoin="round"`;
+  const fill = m.fill ? `fill="${c}" fill-opacity="0.2"` : 'fill="none"';
+  let body = '', hd = '';
+  switch (m.t) {
+    case 'pen': case 'hl': case 'line':
+      hd = poly(m.pts.length > 1 ? m.pts : [m.pts[0], m.pts[0]]); body = `<path d="${hd}" fill="none" ${st}${m.t === 'hl' ? ' stroke-opacity="0.4"' : ''}/>`; break;
+    case 'arrow': { const a = arrowHead(m.pts[0], m.pts[1], m.w); hd = poly(m.pts); body = `<path d="${poly([m.pts[0], a.end])}" fill="none" ${st}/><path d="${poly(a.tri)}Z" fill="${c}"/>`; break; }
+    case 'rect': { const b = box2(m); hd = poly([[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]]) + 'Z'; body = `<path d="${hd}" ${fill} ${st}/>`; break; }
+    case 'ellipse': { const b = box2(m); body = `<ellipse cx="${r3(b.x + b.w / 2)}" cy="${r3(b.y + b.h / 2)}" rx="${r3(b.w / 2)}" ry="${r3(b.h / 2)}" ${fill} ${st}/>`; if (hit) body += `<ellipse cx="${r3(b.x + b.w / 2)}" cy="${r3(b.y + b.h / 2)}" rx="${r3(b.w / 2)}" ry="${r3(b.h / 2)}" fill="none" stroke="transparent" stroke-width="${r3(10 / zoom)}"/>`; break; }
+    case 'cloud': hd = poly(cloudPts(m)) + 'Z'; body = `<path d="${hd}" ${fill} ${st}/>`; break;
+    case 'text': { const t = textBlock(m); if (hit) body += `<rect x="${r3(m.pts[0][0])}" y="${r3(m.pts[0][1])}" width="${r3(t.w)}" height="${r3(t.h)}" fill="transparent"/>`; body += textSVG(t.lines, m.pts[0][0], m.pts[0][1], m.fs, t.lh, c); break; }
+    case 'callout': { const b = calloutBox(m), a = arrowHead(m.pts[1], m.pts[0], m.w); hd = poly(m.pts);
+      body = `<path d="${poly([m.pts[1], a.end])}" fill="none" ${st}/><path d="${poly(a.tri)}Z" fill="${c}"/><rect x="${r3(b.bx)}" y="${r3(b.by)}" width="${r3(b.bw)}" height="${r3(b.bh)}" fill="#fff" ${st}/>` + textSVG(b.t.lines, b.bx + b.pad, b.by + b.pad, m.fs, b.t.lh, c); break; }
+    case 'stamp': { const L = stampLayout(m);
+      body = `<rect x="${r3(L.x)}" y="${r3(L.y)}" width="${r3(L.w)}" height="${r3(L.h)}" rx="${r3(m.fs * 0.5)}" fill="#fff" fill-opacity="0.85" stroke="${c}" stroke-width="${r3(Math.max(1.5, m.w))}"/>` +
+        `<text x="${r3(L.tx)}" y="${r3(L.ty)}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="${r3(L.big)}" fill="${c}">${esc(m.text)}</text>` +
+        (L.sub ? `<text x="${r3(L.tx)}" y="${r3(L.sy)}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${r3(L.small)}" fill="${c}">${esc(L.sub)}</text>` : ''); break; }
+    case 'len': { const g = lenLabel(m, pg); hd = poly(m.pts);
+      body = `<path d="${hd}${ticks(m).map(t => `M${r3(t[0])} ${r3(t[1])}L${r3(t[2])} ${r3(t[3])}`).join('')}" fill="none" ${st}/>` +
+        `<text x="${r3(g.cx)}" y="${r3(g.cy)}" transform="rotate(${r3(g.deg)} ${r3(g.cx)} ${r3(g.cy)})" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="${r3(m.fs)}" fill="${c}" stroke="#fff" stroke-width="${r3(m.fs * 0.25)}" paint-order="stroke">${esc(g.label)}</text>`; break; }
+    case 'area': { const M = measure(m, pg), [cx, cy] = centroid(m.pts); hd = poly(m.pts) + 'Z';
+      body = `<path d="${hd}" fill="${c}" fill-opacity="${m.fill === false ? 0 : 0.15}" ${st}/>` +
+        `<text x="${r3(cx)}" y="${r3(cy)}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="${r3(m.fs)}" fill="${c}" stroke="#fff" stroke-width="${r3(m.fs * 0.25)}" paint-order="stroke">${esc(M.label)}</text>`; break; }
+    case 'count': { const r = countR(m);
+      body = m.pts.map((p, i) => `<circle cx="${r3(p[0])}" cy="${r3(p[1])}" r="${r3(r)}" fill="${c}" stroke="#fff" stroke-width="1"/><text x="${r3(p[0])}" y="${r3(p[1] + r * 0.4)}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="${r3(r * 1.1)}" fill="#fff">${i + 1}</text>`).join(''); break; }
+  }
+  if (hit && hd) body += `<path d="${hd}" fill="none" stroke="transparent" stroke-width="${r3(Math.max(m.w + 8 / zoom, 10 / zoom))}" stroke-linecap="round"/>`;
+  return `<g data-m="${m.id}">${body}</g>`;
+}
+
+/* =================== pages: loading =================== */
+const pdfPages = new Map(); // page id → { pp (pdf.js page), vp0 }
+async function pageInfo(pg) {
+  if (pdfPages.has(pg.id)) return pdfPages.get(pg.id);
+  const pp = await sources.get(pg.src).doc.getPage(pg.idx + 1), info = { pp, vp0: pp.getViewport({ scale: 1 }) };
+  pdfPages.set(pg.id, info); return info;
+}
+/* Markups this tool saved earlier carry their data in /GPMark: lift them back out as editable markups,
+   and take them off the page so they aren't shown twice. Everything else is left exactly as it was. */
+async function liftOwnMarks(bytes) {
+  try { await ensurePdfLib(); } catch { return { bytes, marks: [] }; }
+  const { PDFDocument, PDFName, PDFArray, PDFDict } = PDFLib;
+  let doc; try { doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false }); } catch { return { bytes, marks: [] }; }
+  const out = []; let changed = false;
+  doc.getPages().forEach((p, i) => {
+    out[i] = [];
+    const annots = p.node.lookup(PDFName.of('Annots'));
+    if (!(annots instanceof PDFArray)) return;
+    const keep = [];
+    for (let k = 0; k < annots.size(); k++) {
+      const ref = annots.get(k), d = doc.context.lookup(ref), gm = d instanceof PDFDict ? d.lookup(PDFName.of('GPMark')) : null;
+      if (gm) { try { out[i].push(JSON.parse(gm.decodeText())); changed = true; continue; } catch {} }
+      keep.push(ref);
+    }
+    if (keep.length !== annots.size()) p.node.set(PDFName.of('Annots'), doc.context.obj(keep));
+  });
+  return { bytes: changed ? await doc.save() : bytes, marks: out };
+}
+async function addFiles(files, at = pages.length) {
+  files = files.filter(f => /\.pdf$/i.test(f.name) || f.type === 'application/pdf');
+  if (!files.length) return toast('Drop PDF files');
+  const added = [];
+  for (const f of files) {
+    busy(`Opening ${f.name}…`); await tick();
+    try {
+      const raw = new Uint8Array(await f.arrayBuffer());
+      const { bytes, marks } = await liftOwnMarks(raw);
+      const id = uid(), doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+      sources.set(id, { id, name: f.name, bytes, doc });
+      for (let i = 0; i < doc.numPages; i++) {
+        const pp = await doc.getPage(i + 1), vp0 = pp.getViewport({ scale: 1 }), pg = { id: uid(), src: id, idx: i, rot: 0, w0: vp0.width, h0: vp0.height, cal: null, marks: [] };
+        pdfPages.set(pg.id, { pp, vp0 });
+        for (const jm of (marks[i] || [])) { // user space → this page's view
+          const m = { ...jm, id: uid(), pts: jm.pts.map(([x, y]) => vp0.convertToViewportPoint(x, y)) };
+          if (m.cal) { pg.cal = m.cal; delete m.cal; }
+          pg.marks.push(m);
+        }
+        added.push(pg);
+      }
+    } catch (e) { busy(''); alert(`Could not open ${f.name}: ${e.message}`); }
+  }
+  busy('');
+  if (!added.length) return;
+  checkpoint();
+  pages.splice(at, 0, ...added);
+  const lifted = added.reduce((n, p) => n + p.marks.length, 0);
+  active = at; layout(); renderThumbs(); saveState(true);
+  if (lifted) toast(`Reopened ${lifted} markup${lifted > 1 ? 's' : ''} made here earlier; they're editable again`);
+  setTimeout(() => scrollToPage(at), 50);
+}
+
+/* =================== view: layout, render, zoom =================== */
+let zoom = 1, fitMode = 'width';
+const dpr = () => window.devicePixelRatio || 1;
+const rotDims = pg => pg.rot % 180 ? [pg.h0, pg.w0] : [pg.w0, pg.h0];
+function rotMatrix(pg) { // page view (scale 1) → rotated view
+  const W = pg.w0, H = pg.h0;
+  return { 0: [1, 0, 0, 1, 0, 0], 90: [0, 1, -1, 0, H, 0], 180: [-1, 0, 0, -1, W, H], 270: [0, -1, 1, 0, 0, W] }[pg.rot % 360];
+}
+const pageDivs = [];
+let io = null;
+function layout() {
+  const host = $('pages'); host.innerHTML = ''; pageDivs.length = 0;
+  if (io) io.disconnect();
+  io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) renderPage(+e.target.dataset.i); }), { root: $('stage'), rootMargin: '600px 0px' });
+  pages.forEach((pg, i) => {
+    const [W, H] = rotDims(pg), div = document.createElement('div');
+    div.className = 'pg' + (i === active ? ' active' : ''); div.dataset.i = i;
+    div.style.width = W * zoom + 'px'; div.style.height = H * zoom + 'px';
+    const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.innerHTML = `<g class="rot" transform="matrix(${rotMatrix(pg).join(' ')})"><g class="mk">${pg.marks.map(m => markSVG(m, pg, true)).join('')}</g><g class="ui"></g></g>`;
+    div.innerHTML = `<span class="lbl">${i + 1}</span>`; div.appendChild(svg);
+    host.appendChild(div); pageDivs.push(div); io.observe(div); wire(svg, div);
+  });
+  $('drop').hidden = pages.length > 0;
+  ['addBtn', 'clearBtn', 'saveBtn', 'saveMore', 'findBtn'].forEach(id => $(id).disabled = !pages.length);
+  $('pgCount').textContent = pages.length; $('pgNum').value = pages.length ? active + 1 : '';
+  $('docName').textContent = [...new Set(pages.map(p => sources.get(p.src).name))].join(' + ');
+  $('stage').classList.toggle('drawing', tool !== 'select' && tool !== 'pan');
+  drawSel(); renderList(); syncBar();
+}
+async function renderPage(i) {
+  const pg = pages[i], div = pageDivs[i]; if (!pg || !div) return;
+  const key = zoom + '|' + pg.rot; if (div.dataset.r === key) return; div.dataset.r = key;
+  const { pp } = await pageInfo(pg), rotation = (pp.rotate + pg.rot) % 360, v1 = pp.getViewport({ scale: 1, rotation });
+  const scale = Math.min(zoom * dpr(), 6000 / Math.max(v1.width, v1.height)), vp = pp.getViewport({ scale, rotation });
+  const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+  if (div._task) try { div._task.cancel(); } catch {}
+  const task = pp.render({ canvasContext: c.getContext('2d'), viewport: vp, annotationMode: pdfjsLib.AnnotationMode.ENABLE });
+  div._task = task;
+  try { await task.promise; } catch { return; }
+  if (div.dataset.r !== key) return;
+  div.querySelector('canvas')?.remove(); div.insertBefore(c, div.querySelector('svg'));
+}
+function rerenderMarks(i) { // marks of one page only
+  const pg = pages[i], svg = pageDivs[i]?.querySelector('svg'); if (!svg) return;
+  svg.querySelector('.mk').innerHTML = pg.marks.map(m => markSVG(m, pg, true)).join('');
+}
+function updateMarkEl(i, m) {
+  const svg = pageDivs[i]?.querySelector('svg'); if (!svg) return;
+  const tmp = document.createElementNS(NS, 'g'); tmp.innerHTML = markSVG(m, pages[i], true);
+  const old = svg.querySelector(`[data-m="${m.id}"]`); if (old) old.replaceWith(tmp.firstChild); else svg.querySelector('.mk').appendChild(tmp.firstChild);
+}
+function setZoom(z, at) {
+  const st = $('stage'), sr = st.getBoundingClientRect();
+  at = at || { x: sr.left + st.clientWidth / 2, y: sr.top + st.clientHeight / 2 };
+  const el = document.elementFromPoint(at.x, at.y)?.closest?.('.pg'), i = el ? +el.dataset.i : active, div = pageDivs[i];
+  let rel = null; if (div) { const r = div.getBoundingClientRect(); rel = [(at.x - r.left) / r.width, (at.y - r.top) / r.height]; }
+  zoom = Math.min(8, Math.max(0.1, z)); fitMode = null;
+  pages.forEach((pg, k) => { const [W, H] = rotDims(pg); pageDivs[k].style.width = W * zoom + 'px'; pageDivs[k].style.height = H * zoom + 'px'; });
+  if (div && rel) { const r = div.getBoundingClientRect(); st.scrollLeft += r.left + rel[0] * r.width - at.x; st.scrollTop += r.top + rel[1] * r.height - at.y; }
+  clearTimeout(setZoom.t); setZoom.t = setTimeout(() => { pageDivs.forEach((d, k) => { const r = d.getBoundingClientRect(), sr2 = st.getBoundingClientRect(); if (r.bottom > sr2.top - 600 && r.top < sr2.bottom + 600) renderPage(k); }); }, 160);
+  syncZoom(); drawSel();
+}
+function fit(mode) {
+  if (!pages.length) return;
+  const st = $('stage'), [W, H] = rotDims(pages[active]);
+  const z = mode === 'width' ? (st.clientWidth - 60) / W : Math.min((st.clientWidth - 60) / W, (st.clientHeight - 50) / H);
+  setZoom(z); fitMode = mode; syncZoom(); if (mode === 'page') scrollToPage(active);
+}
+const ZOOMS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 6, 8];
+function syncZoom() {
+  const pct = Math.round(zoom * 100), sel_ = $('zSel');
+  sel_.innerHTML = (ZOOMS.some(z => Math.round(z * 100) === pct) ? '' : `<option value="cur">${pct}%</option>`) + ZOOMS.map(z => `<option value="${z}">${Math.round(z * 100)}%</option>`).join('');
+  sel_.value = ZOOMS.find(z => Math.round(z * 100) === pct) ? String(ZOOMS.find(z => Math.round(z * 100) === pct)) : 'cur';
+}
+function stepZoom(dir) { const n = dir > 0 ? ZOOMS.find(v => v > zoom + 0.001) : [...ZOOMS].reverse().find(v => v < zoom - 0.001); if (n) setZoom(n); }
+function scrollToPage(i, y) {
+  const div = pageDivs[i]; if (!div) return;
+  const st = $('stage');
+  st.scrollTop = div.offsetTop - 24 + (y || 0);
+  setActive(i);
+}
+function setActive(i) {
+  if (i === active || !pages[i]) return;
+  active = i; pageDivs.forEach((d, k) => d.classList.toggle('active', k === i));
+  document.querySelectorAll('.th').forEach((t, k) => t.classList.toggle('on', k === i));
+  $('pgNum').value = i + 1; syncScale();
+}
+$('stage').addEventListener('scroll', () => {
+  const st = $('stage').getBoundingClientRect(), mid = st.top + st.height * 0.35;
+  for (let i = 0; i < pageDivs.length; i++) { const r = pageDivs[i].getBoundingClientRect(); if (r.top <= mid && r.bottom >= mid) { if (!drag && !drawing) setActive(i); break; } }
+});
+
+/* =================== thumbnails & page work =================== */
+function renderThumbs() {
+  const host = $('thumbs'); host.innerHTML = '';
+  pages.forEach((pg, i) => {
+    const d = document.createElement('div'); d.className = 'th' + (i === active ? ' on' : ''); d.draggable = true; d.dataset.i = i;
+    const [W, H] = rotDims(pg);
+    d.innerHTML = `<canvas width="${Math.round(140 * W / H > 140 ? 140 : 140 * W / H)}" height="10"></canvas><div class="n"><span>${i + 1}</span>${pg.marks.length ? `<span class="dot" title="Markups on this page">${pg.marks.length}</span>` : ''}</div>` +
+      `<div class="acts"><button data-act="rot" title="Rotate 90°">↻</button><button data-act="del" title="Delete page">✕</button></div>`;
+    host.appendChild(d);
+    (async () => { const { pp } = await pageInfo(pg), rotation = (pp.rotate + pg.rot) % 360, v = pp.getViewport({ scale: 1, rotation }), s = 130 / v.width, vp = pp.getViewport({ scale: s, rotation });
+      const c = d.querySelector('canvas'); c.width = vp.width; c.height = vp.height; try { await pp.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise; } catch {} })();
+  });
+}
+$('thumbs').addEventListener('click', e => {
+  const t = e.target.closest('.th'); if (!t) return; const i = +t.dataset.i, act = e.target.closest('[data-act]')?.dataset.act;
+  if (act === 'rot') { checkpoint(); pages[i].rot = (pages[i].rot + 90) % 360; layout(); renderThumbs(); saveState(); return; }
+  if (act === 'del') {
+    if (pages[i].marks.length && !confirm(`Delete page ${i + 1} and its ${pages[i].marks.length} markups?`)) return;
+    checkpoint(); pages.splice(i, 1); active = Math.min(active, pages.length - 1); sel = null; layout(); renderThumbs(); saveState(); return;
+  }
+  scrollToPage(i);
+});
+let dragThumb = null;
+$('thumbs').addEventListener('dragstart', e => { const t = e.target.closest('.th'); if (!t) return; dragThumb = +t.dataset.i; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'page'); });
+$('thumbs').addEventListener('dragover', e => {
+  if (dragThumb == null) return; e.preventDefault();
+  document.querySelectorAll('.th').forEach(t => t.classList.remove('dropb', 'dropa'));
+  const t = e.target.closest('.th'); if (!t) return; const r = t.getBoundingClientRect(); t.classList.add(e.clientY < r.top + r.height / 2 ? 'dropb' : 'dropa');
+});
+$('thumbs').addEventListener('drop', e => {
+  if (dragThumb == null) return; e.preventDefault(); e.stopPropagation();
+  const t = e.target.closest('.th'); document.querySelectorAll('.th').forEach(x => x.classList.remove('dropb', 'dropa'));
+  if (!t) { dragThumb = null; return; }
+  const r = t.getBoundingClientRect(); let to = +t.dataset.i + (e.clientY < r.top + r.height / 2 ? 0 : 1); const from = dragThumb; dragThumb = null;
+  if (to === from || to === from + 1) return;
+  checkpoint(); const [pg] = pages.splice(from, 1); if (to > from) to--; pages.splice(to, 0, pg); active = to; layout(); renderThumbs(); saveState();
+});
+$('thumbs').addEventListener('dragend', () => { dragThumb = null; document.querySelectorAll('.th').forEach(x => x.classList.remove('dropb', 'dropa')); });
+
+/* =================== selection & handles =================== */
+function findMark(s) { return s && pages[s.p] && pages[s.p].marks.find(m => m.id === s.id); }
+function drawSel() {
+  pageDivs.forEach(d => { const u = d.querySelector('.ui'); if (u) u.innerHTML = ''; });
+  const m = findMark(sel); if (!m) return;
+  const ui = pageDivs[sel.p]?.querySelector('.ui'); if (!ui) return;
+  const k = 1 / zoom, hs = 9 * k, sw = 1.5 * k, b = markBBox(m);
+  let out = `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="none" stroke="#2563eb" stroke-width="${sw}" stroke-dasharray="${4 * k} ${3 * k}" pointer-events="none"/>`;
+  const isBox = ['rect', 'ellipse', 'cloud'].includes(m.t), pts = ['line', 'arrow', 'callout', 'len', 'area', 'count'].includes(m.t);
+  const hp = isBox ? (({ x, y, w, h }) => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]])(box2(m)) : pts ? m.pts : [];
+  hp.forEach(([x, y], i) => out += `<circle data-mh="${isBox ? 'b' : ''}${i}" cx="${x}" cy="${y}" r="${hs / 2}" fill="#fff" stroke="#2563eb" stroke-width="${sw}"/>`);
+  ui.innerHTML = out;
+}
+function select(p, id) { sel = id ? { p, id } : null; drawSel(); syncBar(); renderList(); }
+
+/* =================== pointer input =================== */
+let spaceDown = false, lastDown = null;
+function toPt(div, e) { const g = div.querySelector('.rot'); const q = new DOMPoint(e.clientX, e.clientY).matrixTransform(g.getScreenCTM().inverse()); return [q.x, q.y]; }
+function constrain(p0, p, shift, square) {
+  if (!shift) return p;
+  const dx = p[0] - p0[0], dy = p[1] - p0[1];
+  if (square) { const s = Math.max(Math.abs(dx), Math.abs(dy)); return [p0[0] + Math.sign(dx || 1) * s, p0[1] + Math.sign(dy || 1) * s]; }
+  const L = Math.hypot(dx, dy), a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+  return [p0[0] + L * Math.cos(a), p0[1] + L * Math.sin(a)];
+}
+const author = () => $('author').value.trim();
+function newMark(t, p) {
+  const isM = MEASURE.includes(t);
+  const m = { id: uid(), t, c: t === 'hl' ? S.hl : isM ? S.mc : S.c, w: t === 'hl' ? 10 : S.w, fs: S.fs, pts: [p, [...p]], author: author(), date: new Date().toISOString(), status: '', comment: '' };
+  if (t === 'pen' || t === 'hl' || t === 'text' || t === 'stamp' || t === 'count') m.pts = [p];
+  if (['rect', 'ellipse', 'cloud'].includes(t)) m.fill = S.fill;
+  if (t === 'area') m.fill = true;
+  if (t === 'text' || t === 'callout') m.text = '';
+  if (t === 'stamp') { m.text = S.stamp; m.sub = [author(), new Date().toLocaleDateString('en-AU')].filter(Boolean).join(' · '); }
+  return m;
+}
+function wire(svg, div) {
+  const pi = () => +div.dataset.i;
+  svg.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || spaceDown || tool === 'pan' || document.querySelector('.ted')) return;
+    const i = pi(), pg = pages[i], p = toPt(div, e); setActive(i);
+    // two-point calibration
+    if (tool === 'cal') {
+      drawing = drawing && drawing.cal && drawing.i === i ? drawing : { cal: true, i, pts: [] };
+      drawing.pts.push(p); drawCal();
+      if (drawing.pts.length === 2) {
+        const d = Math.hypot(drawing.pts[1][0] - drawing.pts[0][0], drawing.pts[1][1] - drawing.pts[0][1]);
+        const v = parseFloat(prompt(`Real distance between the two points, in mm?\n(On paper it is ${Math.round(d / U * 10) / 10} mm.)`, ''));
+        drawing = null; drawCal();
+        if (v > 0 && d > 0) { checkpoint(); pg.cal = { f: v / d, label: 'Calibrated' }; rerenderMarks(i); renderList(); syncScale(); saveState(); toast(`Page ${i + 1} calibrated: 1 mm on paper = ${Math.round(v / d * U * 100) / 100} mm`); }
+        setTool('select');
+      }
+      return;
+    }
+    // click-by-click tools: length, area, count
+    if (tool === 'len' || tool === 'area' || tool === 'count') {
+      e.preventDefault();
+      if (!drawing || drawing.i !== i) { if (drawing) finishDrawing(); checkpoint(); const m = newMark(tool, p); pg.marks.push(m); drawing = { i, m }; if (tool === 'count') { updateMarkEl(i, m); renderList(); } return; }
+      const m = drawing.m, last = m.pts[m.pts.length - (tool === 'count' ? 1 : 2)], now = Date.now();
+      if (tool !== 'count' && drawing.t && now - drawing.t < 400 && Math.hypot(p[0] - last[0], p[1] - last[1]) < 6 / zoom) { finishDrawing(); return; }
+      if (tool === 'count') m.pts.push(p); else { m.pts[m.pts.length - 1] = constrain(last, p, e.shiftKey); m.pts.push([...m.pts[m.pts.length - 1]]); }
+      drawing.t = now; updateMarkEl(i, m); renderList(); return;
+    }
+    if (tool !== 'select') {
+      // a double-click on existing text / callout edits it instead of drawing
+      const mEl = e.target.closest('[data-m]'), hitM = mEl && pg.marks.find(q => q.id === mEl.dataset.m), now = Date.now();
+      if (hitM && (hitM.t === 'text' || hitM.t === 'callout') && (tool === 'text' || (lastDown && lastDown.id === hitM.id && now - lastDown.t < 450))) { e.preventDefault(); lastDown = null; select(i, hitM.id); editText(i, hitM, false); return; }
+      lastDown = hitM ? { id: hitM.id, t: now } : null;
+      checkpoint();
+      const m = newMark(tool, p); pg.marks.push(m); updateMarkEl(i, m);
+      if (tool === 'text') { e.preventDefault(); select(i, m.id); editText(i, m, true); return; }
+      if (tool === 'stamp') { e.preventDefault(); setTool('select'); select(i, m.id); renderThumbs(); saveState(); return; }
+      drag = { mode: 'draw', div, m, i }; svg.setPointerCapture(e.pointerId); e.preventDefault(); return;
+    }
+    const mh = e.target.closest('[data-mh]'), mEl = e.target.closest('[data-m]');
+    if (mh && findMark(sel) && sel.p === i) {
+      const m = findMark(sel), id = mh.dataset.mh;
+      if (id[0] === 'b') { const b = box2(m), cs = [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]]; drag = { mode: 'mbox', div, m, i, anchor: cs[(+id.slice(1) + 2) % 4] }; }
+      else drag = { mode: 'mpt', div, m, i, k: +id };
+    } else if (mEl) {
+      select(i, mEl.dataset.m); const m = findMark(sel);
+      drag = { mode: 'move', div, m, i, start: p, orig: m.pts.map(q => [...q]) };
+    } else { select(null); return; }
+    drag.fresh = true; svg.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  svg.addEventListener('pointermove', e => {
+    if (pinch) return;
+    const i = pi();
+    if (drawing && drawing.i === i && drawing.m && drawing.m.t !== 'count') { const m = drawing.m, p = toPt(div, e); m.pts[m.pts.length - 1] = constrain(m.pts[m.pts.length - 2], p, e.shiftKey); updateMarkEl(i, m); return; }
+    if (!drag || drag.div !== div) return;
+    if (drag.fresh) { drag.fresh = false; checkpoint(); }
+    const p = toPt(div, e), m = drag.m;
+    if (drag.mode === 'draw') {
+      if (m.t === 'pen' || m.t === 'hl') { const l = m.pts[m.pts.length - 1]; if (Math.hypot(p[0] - l[0], p[1] - l[1]) > 1.5 / zoom) m.pts.push([r3(p[0]), r3(p[1])]); }
+      else m.pts[1] = constrain(m.pts[0], p, e.shiftKey, ['rect', 'ellipse', 'cloud'].includes(m.t));
+    } else if (drag.mode === 'move') { const dx = p[0] - drag.start[0], dy = p[1] - drag.start[1]; m.pts = drag.orig.map(q => [q[0] + dx, q[1] + dy]); }
+    else if (drag.mode === 'mpt') { m.pts[drag.k] = m.pts.length === 2 ? constrain(m.pts[1 - drag.k], p, e.shiftKey) : p; }
+    else if (drag.mode === 'mbox') m.pts = [drag.anchor, constrain(drag.anchor, p, e.shiftKey, true)];
+    updateMarkEl(i, m); if (drag.mode !== 'draw') drawSel();
+  });
+  const end = () => {
+    if (!drag || drag.div !== div) return;
+    const d = drag; drag = null;
+    if (d.mode === 'draw') {
+      const m = d.m, tiny = m.pts.length < 2 || Math.hypot(m.pts[m.pts.length - 1][0] - m.pts[0][0], m.pts[m.pts.length - 1][1] - m.pts[0][1]) < 3 / zoom;
+      if (m.t === 'callout') { if (tiny) m.pts[1] = [m.pts[0][0] + 40, m.pts[0][1] - 30]; updateMarkEl(d.i, m); select(d.i, m.id); editText(d.i, m, true); return; }
+      if (tiny && m.t !== 'pen' && m.t !== 'hl') { const a = pages[d.i].marks; a.splice(a.indexOf(m), 1); hist.pop(); rerenderMarks(d.i); return; }
+      if (m.pts.length < 2) m.pts.push([m.pts[0][0] + 0.1, m.pts[0][1]]);
+      select(d.i, m.id); renderThumbs();
+    }
+    saveState(); renderList();
+  };
+  svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
+  svg.addEventListener('dblclick', e => {
+    const mEl = e.target.closest('[data-m]'); if (!mEl || tool !== 'select') return;
+    const i = pi(), m = pages[i].marks.find(q => q.id === mEl.dataset.m);
+    if (m && (m.t === 'text' || m.t === 'callout')) editText(i, m, false);
+    if (m && m.t === 'stamp') { const v = prompt('Stamp text', m.text); if (v) { checkpoint(); m.text = v; updateMarkEl(i, m); drawSel(); saveState(); renderList(); } }
+  });
+}
+function finishDrawing() {
+  if (!drawing || !drawing.m) { drawing = null; return; }
+  const { i, m } = drawing; drawing = null;
+  if (m.t !== 'count') m.pts.pop(); // the point following the mouse
+  // drop the duplicate left by a double-click
+  if (m.t !== 'count' && m.pts.length > 2) { const a = m.pts[m.pts.length - 1], b = m.pts[m.pts.length - 2]; if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 6 / zoom) m.pts.pop(); }
+  const min = m.t === 'area' ? 3 : m.t === 'len' ? 2 : 1;
+  if (m.pts.length < min) { const a = pages[i].marks; a.splice(a.indexOf(m), 1); hist.pop(); rerenderMarks(i); renderList(); return; }
+  updateMarkEl(i, m); select(i, m.id); renderThumbs(); saveState(); renderList();
+}
+function drawCal() {
+  pageDivs.forEach(d => d.querySelectorAll('.calpt').forEach(x => x.remove()));
+  if (!drawing || !drawing.cal) return;
+  const ui = pageDivs[drawing.i].querySelector('.ui'), k = 1 / zoom;
+  drawing.pts.forEach(([x, y]) => ui.insertAdjacentHTML('beforeend', `<circle class="calpt" cx="${x}" cy="${y}" r="${5 * k}" fill="#2563eb"/>`));
+}
+
+/* =================== text editing =================== */
+function editText(i, m, isNew) {
+  const div = pageDivs[i], g = div.querySelector('.rot'), ctm = g.getScreenCTM(), dr = div.getBoundingClientRect();
+  const el = div.querySelector(`[data-m="${m.id}"]`); if (el) el.style.visibility = 'hidden';
+  let x = m.pts[0][0], y = m.pts[0][1];
+  if (m.t === 'callout') { const b = calloutBox({ ...m, text: m.text || 'M' }); x = b.bx + b.pad; y = b.by + b.pad; }
+  const q = new DOMPoint(x, y).matrixTransform(ctm);
+  const ta = document.createElement('textarea'); ta.className = 'ted'; ta.value = m.text || '';
+  Object.assign(ta.style, { left: q.x - dr.left + 'px', top: q.y - dr.top + 'px', fontSize: m.fs * zoom + 'px', color: m.c });
+  const grow = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; ta.style.width = 'auto'; ta.style.width = Math.max(m.fs * zoom * 4, ta.scrollWidth + 4) + 'px'; };
+  ta.oninput = grow; div.appendChild(ta); grow(); setTimeout(() => ta.focus(), 0);
+  let done = false;
+  const finish = () => {
+    if (done) return; done = true;
+    const v = ta.value.replace(/\s+$/, ''); ta.remove();
+    if (!v) { if (isNew) hist.pop(); else checkpoint(); const a = pages[i].marks; a.splice(a.indexOf(m), 1); sel = null; }
+    else { if (!isNew && v !== m.text) checkpoint(); m.text = v; }
+    rerenderMarks(i); drawSel(); renderList(); renderThumbs(); saveState();
+    if (pages[i].marks.includes(m)) select(i, m.id);
+  };
+  ta.onblur = finish;
+  ta.onkeydown = e => { if (e.key === 'Escape' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) { e.preventDefault(); finish(); } e.stopPropagation(); };
+}
+
+/* =================== undo / redo / state =================== */
+let hist = [], fut = [];
+const snap = () => pages.map(p => ({ ...p, cal: p.cal && { ...p.cal }, marks: p.marks.map(m => ({ ...m, pts: m.pts.map(q => [...q]) })) }));
+function checkpoint() { hist.push(snap()); if (hist.length > 100) hist.shift(); fut = []; syncUndo(); }
+function undo(redo) {
+  const from = redo ? fut : hist, to = redo ? hist : fut; if (!from.length) return;
+  to.push(snap()); pages = from.pop(); active = Math.min(active, pages.length - 1); sel = null; drawing = null;
+  layout(); renderThumbs(); saveState(); syncUndo();
+}
+function syncUndo() { $('undoBtn').disabled = !hist.length; $('redoBtn').disabled = !fut.length; }
+// session kept in IndexedDB (PDF bytes included) so the work is still here next time
+function idb() { return new Promise((res, rej) => { const r = indexedDB.open('pdfMarkup', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function idbPut(k, v) { try { const db = await idb(); db.transaction('kv', 'readwrite').objectStore('kv').put(v, k); } catch {} }
+async function idbGet(k) { try { const db = await idb(); return await new Promise(res => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => res(null); }); } catch { return null; } }
+let saveT;
+function saveState(withBytes) {
+  clearTimeout(saveT);
+  saveT = setTimeout(() => {
+    const used = new Set(pages.map(p => p.src));
+    idbPut('state', { pages: JSON.parse(JSON.stringify(pages)), srcs: [...sources.values()].filter(s => used.has(s.id)).map(s => ({ id: s.id, name: s.name })) });
+    if (withBytes) idbPut('bytes', [...sources.values()].filter(s => used.has(s.id)).map(s => ({ id: s.id, bytes: s.bytes })));
+  }, 400);
+}
+async function restore() {
+  const st = await idbGet('state'), by = await idbGet('bytes');
+  if (!st || !by || !st.pages.length) return;
+  try {
+    for (const s of st.srcs) { const b = by.find(x => x.id === s.id); if (!b) continue; sources.set(s.id, { id: s.id, name: s.name, bytes: b.bytes, doc: await pdfjsLib.getDocument({ data: b.bytes.slice() }).promise }); }
+    pages = st.pages.filter(p => sources.has(p.src)); active = 0;
+    layout(); renderThumbs(); setTimeout(() => fit('width'), 30);
+    toast('Reopened your last session');
+  } catch {}
+}
+
+/* =================== toolbar =================== */
+function setTool(t) {
+  if (drawing) finishDrawing();
+  tool = t; if (t !== 'select') select(null);
+  document.querySelectorAll('#tools button[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  $('stage').classList.toggle('drawing', t !== 'select' && t !== 'pan');
+  syncBar();
+}
+function syncBar() {
+  const m = findMark(sel), c = m ? m.c : tool === 'hl' ? S.hl : MEASURE.includes(tool) ? S.mc : S.c;
+  document.querySelectorAll('#colors button').forEach(b => b.classList.toggle('on', b.dataset.c === c)); $('mkCustom').value = c;
+  const isHl = m ? m.t === 'hl' : tool === 'hl', ws = isHl ? [6, 10, 16] : [0.5, 1, 1.5, 2, 3, 4];
+  const w = m ? m.w : isHl ? 10 : S.w;
+  $('wSel').innerHTML = [...new Set([...ws, w])].sort((a, b) => a - b).map(v => `<option value="${v}">${v} pt</option>`).join(''); $('wSel').value = String(w);
+  $('fsSel').value = String(m ? m.fs : S.fs); $('fillChk').checked = !!(m ? m.fill : S.fill);
+  $('delBtn').disabled = !m;
+  $('stampSel').hidden = !(tool === 'stamp' || (m && m.t === 'stamp'));
+}
+function setProp(k, v) {
+  const m = findMark(sel);
+  if (m) { checkpoint(); m[k] = v; updateMarkEl(sel.p, m); drawSel(); renderList(); saveState(); }
+  if (k === 'c') { if ((m ? m.t : tool) === 'hl') S.hl = v; else if (MEASURE.includes(m ? m.t : tool)) S.mc = v; else S.c = v; }
+  else if (!(m && m.t === 'hl' && k === 'w')) S[k] = v;
+  store.set('pm:style', S); syncBar();
+}
+TOOLS.forEach(t => {
+  if (!t) { $('tools').insertAdjacentHTML('beforeend', '<span class="gap"></span>'); return; }
+  const b = document.createElement('button'); b.dataset.t = t[0]; b.title = `${t[1]} (${t[2]})`; b.innerHTML = ICON(t[3]); b.onclick = () => setTool(t[0]); $('tools').appendChild(b);
+});
+COLORS.forEach(c => { const b = document.createElement('button'); b.style.background = c; b.dataset.c = c; b.title = c; b.onclick = () => setProp('c', c); $('colors').appendChild(b); });
+$('colors').insertAdjacentHTML('beforeend', '<input type="color" id="mkCustom" title="Custom colour">');
+$('mkCustom').onchange = e => setProp('c', e.target.value);
+$('wSel').onchange = e => setProp('w', +e.target.value);
+$('fsSel').onchange = e => setProp('fs', +e.target.value);
+$('fillChk').onchange = e => setProp('fill', e.target.checked);
+$('stampSel').innerHTML = STAMPS.map(s => `<option>${esc(s)}</option>`).join(''); $('stampSel').value = STAMPS.includes(S.stamp) ? S.stamp : 'APPROVED';
+$('stampSel').onchange = e => {
+  let v = e.target.value; if (v === 'Custom…') { v = (prompt('Stamp text', '') || '').trim().toUpperCase(); if (!v) { e.target.value = S.stamp; return; } }
+  S.stamp = v; store.set('pm:style', S); const m = findMark(sel); if (m && m.t === 'stamp') { checkpoint(); m.text = v; updateMarkEl(sel.p, m); drawSel(); renderList(); saveState(); }
+};
+// scale per page
+function syncScale() {
+  const pg = pages[active], cal = calOf(pg), cur = SCALES.find(s => pg && pg.cal && Math.abs(pg.cal.f - s * 25.4 / 72) < 1e-6);
+  $('scaleSel').innerHTML = SCALES.map(s => `<option value="${s}">1:${s}</option>`).join('') + (pg && pg.cal && !cur ? `<option value="cal">${esc(cal.label)}</option>` : '') + '<option value="calibrate">Calibrate…</option>';
+  $('scaleSel').value = pg && pg.cal ? (cur ? String(cur) : 'cal') : '1';
+}
+$('scaleSel').onchange = e => {
+  const v = e.target.value; if (v === 'cal') return;
+  if (v === 'calibrate') { setTool('cal'); toast('Click two points a known distance apart'); syncScale(); return; }
+  const pg = pages[active]; if (!pg) return; checkpoint(); pg.cal = +v === 1 ? null : { f: +v * 25.4 / 72, label: '1:' + v }; rerenderMarks(active); renderList(); saveState(); syncScale();
+};
+$('scaleAll').onclick = () => { const c = pages[active]?.cal; checkpoint(); pages.forEach((p, i) => { p.cal = c ? { ...c } : null; rerenderMarks(i); }); renderList(); saveState(); toast(`Scale ${calOf(pages[active]).label} set on all ${pages.length} pages`); };
+$('undoBtn').onclick = () => undo(false); $('redoBtn').onclick = () => undo(true);
+function deleteSel() { const m = findMark(sel); if (!m) return; checkpoint(); const a = pages[sel.p].marks; a.splice(a.indexOf(m), 1); const p = sel.p; sel = null; rerenderMarks(p); drawSel(); renderList(); renderThumbs(); saveState(); syncBar(); }
+$('delBtn').onclick = deleteSel;
+// zoom & pan
+$('zIn').onclick = () => stepZoom(1); $('zOut').onclick = () => stepZoom(-1);
+$('zSel').onchange = e => { if (e.target.value !== 'cur') setZoom(+e.target.value); e.target.blur(); };
+$('fitW').onclick = () => fit('width'); $('fitP').onclick = () => fit('page');
+$('pgNum').onchange = e => { const n = Math.min(pages.length, Math.max(1, +e.target.value || 1)); scrollToPage(n - 1); };
+$('stage').addEventListener('wheel', e => { if (!e.ctrlKey && !e.metaKey) return; e.preventDefault(); setZoom(zoom * Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.0015)), { x: e.clientX, y: e.clientY }); }, { passive: false });
+let pan = null;
+$('stage').addEventListener('pointerdown', e => {
+  if (e.pointerType === 'touch') return; // fingers: see touch handling below
+  if (!(e.button === 1 || (e.button === 0 && (spaceDown || tool === 'pan')))) return;
+  e.preventDefault(); const st = $('stage'); pan = { x: e.clientX, y: e.clientY, l: st.scrollLeft, t: st.scrollTop }; st.classList.add('panning'); st.setPointerCapture(e.pointerId);
+}, true);
+$('stage').addEventListener('pointermove', e => { if (pan) { const st = $('stage'); st.scrollLeft = pan.l - (e.clientX - pan.x); st.scrollTop = pan.t - (e.clientY - pan.y); } });
+const endPan = () => { pan = null; $('stage').classList.remove('panning'); };
+$('stage').addEventListener('pointerup', endPan); $('stage').addEventListener('pointercancel', endPan);
+$('stage').addEventListener('auxclick', e => { if (e.button === 1) e.preventDefault(); });
+// Touch: one finger pans (Pan tool, Select tool off a markup, or off the page) and otherwise draws;
+// two fingers pinch-zoom and pan, cancelling a stroke the first finger had just started.
+const touches = new Map(); let pinch = null, touchPan = null, touchStart = null, pinchRaf = 0;
+function cancelTouchStroke() {
+  if (drag) {
+    const d = drag; drag = null;
+    if (d.mode === 'draw') { const a = pages[d.i].marks, k = a.indexOf(d.m); if (k >= 0) a.splice(k, 1); if (touchStart) hist.length = touchStart.histLen; rerenderMarks(d.i); }
+    else if (d.mode === 'move') { d.m.pts = d.orig; updateMarkEl(d.i, d.m); drawSel(); if (!d.fresh) hist.pop(); }
+    syncUndo();
+  }
+  if (drawing && drawing.m && touchStart && Date.now() - touchStart.t < 600) {
+    if (drawing !== touchStart.drawing) { const a = pages[drawing.i].marks, i = drawing.i; a.splice(a.indexOf(drawing.m), 1); drawing = null; hist.length = touchStart.histLen; rerenderMarks(i); renderList(); syncUndo(); }
+    else if (touchStart.len) { drawing.m.pts.length = touchStart.len; updateMarkEl(drawing.i, drawing.m); renderList(); }
+  }
+}
+$('stage').addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'touch') return;
+  const st = $('stage');
+  touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (touches.size >= 2) {
+    e.stopPropagation(); e.preventDefault();
+    if (touches.size > 2) return;
+    cancelTouchStroke(); touchPan = null;
+    const [a, b] = [...touches.values()];
+    pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: zoom, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+    return;
+  }
+  touchStart = { t: Date.now(), drawing, len: drawing && drawing.m ? drawing.m.pts.length : 0, histLen: hist.length };
+  const onPage = e.target.closest('.pg svg'), onMark = e.target.closest('[data-m],[data-mh]');
+  if (tool === 'pan' || !onPage || (tool === 'select' && !onMark) || document.querySelector('.ted')) {
+    if (document.querySelector('.ted') && onPage) return; // let the text editor's own handling close it
+    touchPan = { x: e.clientX, y: e.clientY, l: st.scrollLeft, t: st.scrollTop, moved: false };
+    e.stopPropagation(); e.preventDefault();
+  }
+}, true);
+addEventListener('pointermove', e => {
+  if (e.pointerType !== 'touch' || !touches.has(e.pointerId)) return;
+  touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const st = $('stage');
+  if (pinch && touches.size >= 2) {
+    e.stopPropagation();
+    if (pinchRaf) return;
+    pinchRaf = requestAnimationFrame(() => {
+      pinchRaf = 0; if (!pinch) return;
+      const [a, b] = [...touches.values()], mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      setZoom(pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d, { x: mx, y: my });
+      st.scrollLeft -= mx - pinch.mx; st.scrollTop -= my - pinch.my; pinch.mx = mx; pinch.my = my;
+    });
+  } else if (touchPan) {
+    const dx = e.clientX - touchPan.x, dy = e.clientY - touchPan.y;
+    if (Math.hypot(dx, dy) > 6) touchPan.moved = true;
+    st.scrollLeft = touchPan.l - dx; st.scrollTop = touchPan.t - dy;
+  }
+}, true);
+const touchEnd = e => {
+  if (e.pointerType !== 'touch' || !touches.has(e.pointerId)) return;
+  touches.delete(e.pointerId);
+  const st = $('stage');
+  if (pinch) {
+    if (touches.size < 2) { pinch = null; const p = [...touches.values()][0]; touchPan = p ? { x: p.x, y: p.y, l: st.scrollLeft, t: st.scrollTop, moved: true } : null; }
+    return;
+  }
+  if (touchPan && !touches.size) { if (!touchPan.moved && e.type === 'pointerup' && tool === 'select') select(null); touchPan = null; }
+};
+addEventListener('pointerup', touchEnd, true); addEventListener('pointercancel', touchEnd, true);
+document.addEventListener('gesturestart', e => e.preventDefault()); // iPad: no whole-page zoom
+// keys
+addEventListener('keydown', e => {
+  const ctrl = e.ctrlKey || e.metaKey, typing = e.target.closest?.('input,select,textarea');
+  if (ctrl && (e.key === '=' || e.key === '+')) { e.preventDefault(); stepZoom(1); return; }
+  if (ctrl && e.key === '-') { e.preventDefault(); stepZoom(-1); return; }
+  if (ctrl && e.key === '0') { e.preventDefault(); fit('width'); return; }
+  if (ctrl && e.key.toLowerCase() === 'f') { e.preventDefault(); openFind(); return; }
+  if (typing) return;
+  if (e.key === ' ') { e.preventDefault(); if (!spaceDown) { spaceDown = true; $('stage').classList.add('space'); } return; }
+  if (ctrl && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(e.shiftKey); return; }
+  if (ctrl && e.key.toLowerCase() === 'y') { e.preventDefault(); undo(true); return; }
+  if (ctrl && e.key.toLowerCase() === 's') { e.preventDefault(); if (pages.length) exportPdf(false); return; }
+  if (e.key === 'Enter' && drawing) { finishDrawing(); return; }
+  if (e.key === 'Backspace' && drawing && drawing.m) { e.preventDefault(); const m = drawing.m; if (m.pts.length > (m.t === 'count' ? 1 : 2)) { m.pts.splice(m.pts.length - (m.t === 'count' ? 1 : 2), 1); updateMarkEl(drawing.i, m); } return; }
+  if (e.key === 'Escape') { if (drawing) { if (drawing.m && drawing.m.t === 'count') finishDrawing(); else if (drawing.m) finishDrawing(); else { drawing = null; drawCal(); } } else if (tool !== 'select') setTool('select'); else select(null); return; }
+  if (!ctrl && !e.altKey) { const t = TOOLS.find(x => x && x[2].toLowerCase() === e.key.toLowerCase()); if (t) { setTool(t[0]); return; } }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && sel) { e.preventDefault(); deleteSel(); return; }
+  if (e.key === 'PageDown') { e.preventDefault(); scrollToPage(Math.min(pages.length - 1, active + 1)); }
+  if (e.key === 'PageUp') { e.preventDefault(); scrollToPage(Math.max(0, active - 1)); }
+}, true);
+addEventListener('keyup', e => { if (e.key === ' ') { spaceDown = false; $('stage').classList.remove('space'); } });
+addEventListener('blur', () => { spaceDown = false; $('stage').classList.remove('space'); });
+addEventListener('resize', () => { if (fitMode) fit(fitMode); else drawSel(); });
+
+/* =================== markups list =================== */
+function rows() {
+  const out = [];
+  pages.forEach((pg, i) => pg.marks.forEach(m => {
+    const M = measure(m, pg);
+    out.push({ i, m, page: i + 1, type: NAMES[m.t], value: M ? M.label : (m.text || '').replace(/\s+/g, ' '), extra: M && M.sub || '', raw: M ? M.value : '' });
+  }));
+  return out;
+}
+function renderList() {
+  const fT = $('fType').value, fS = $('fStatus').value, fX = $('fText').value.trim().toLowerCase();
+  const all = rows(), list = all.filter(r => (!fT || r.type === fT) && (!fS || (r.m.status || '') === fS) && (!fX || (r.value + ' ' + r.m.comment + ' ' + r.m.author).toLowerCase().includes(fX)));
+  $('mCount').textContent = all.length ? `${all.length}${list.length !== all.length ? ` · ${list.length} shown` : ''}` : '';
+  const types = [...new Set(all.map(r => r.type))]; $('fType').innerHTML = '<option value="">All types</option>' + types.map(t => `<option ${t === fT ? 'selected' : ''}>${t}</option>`).join('');
+  // totals of measurements in view
+  const tot = {}; list.forEach(r => { if (r.m.t === 'len') tot.len = (tot.len || 0) + r.raw; if (r.m.t === 'area') tot.area = (tot.area || 0) + r.raw; if (r.m.t === 'count') tot.count = (tot.count || 0) + r.raw; });
+  $('lt').innerHTML = list.length ? `<table><thead><tr><th>Page</th><th>Type</th><th>Value / text</th><th>Comment</th><th>Status</th><th>Author</th><th>Date</th></tr></thead><tbody>` +
+    list.map(r => `<tr data-p="${r.i}" data-id="${r.m.id}" class="${sel && sel.id === r.m.id ? 'on' : ''}"><td class="num">${r.page}</td><td><span class="sw0" style="background:${r.m.c}"></span>${r.type}</td>` +
+      `<td title="${esc(r.extra)}">${esc(r.value)}${r.extra ? ` <span class="muted">· ${esc(r.extra)}</span>` : ''}</td>` +
+      `<td><input data-f="comment" value="${esc(r.m.comment || '')}" placeholder="Add a comment"></td>` +
+      `<td><select data-f="status" class="st-${r.m.status || 'none'}">${STATUSES.map(s => `<option value="${s}" ${s === (r.m.status || '') ? 'selected' : ''}>${s || '—'}</option>`).join('')}</select></td>` +
+      `<td>${esc(r.m.author || '')}</td><td class="muted">${r.m.date ? new Date(r.m.date).toLocaleDateString('en-AU') : ''}</td></tr>`).join('') +
+    `</tbody>${tot.len || tot.area || tot.count ? `<tfoot><tr><td></td><td colspan="6" class="muted">Totals shown: ${[tot.len ? 'length ' + fmtMM(tot.len) : '', tot.area ? 'area ' + fmtM2(tot.area) : '', tot.count ? tot.count + ' counted' : ''].filter(Boolean).join(' · ')}</td></tr></tfoot>` : ''}</table>`
+    : `<div class="muted" style="padding:12px">${pages.length ? 'No markups yet. Pick a tool above and mark up the drawing.' : 'Open a PDF to start.'}</div>`;
+}
+$('lt').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-id]'); if (!tr || e.target.closest('input,select')) return;
+  const i = +tr.dataset.p; setTool('select'); select(i, tr.dataset.id);
+  const m = findMark(sel), b = markBBox(m), div = pageDivs[i], st = $('stage'), g = div.querySelector('.rot');
+  const q = new DOMPoint(b.x + b.w / 2, b.y + b.h / 2).matrixTransform(g.getScreenCTM()), sr = st.getBoundingClientRect();
+  st.scrollBy({ left: q.x - sr.left - st.clientWidth / 2, top: q.y - sr.top - st.clientHeight / 2, behavior: 'smooth' }); setActive(i);
+});
+$('lt').addEventListener('change', e => {
+  const f = e.target.dataset.f, tr = e.target.closest('tr[data-id]'); if (!f || !tr) return;
+  const m = pages[+tr.dataset.p].marks.find(q => q.id === tr.dataset.id); if (!m) return;
+  checkpoint(); m[f] = e.target.value; saveState(); if (f === 'status') e.target.className = 'st-' + (m.status || 'none');
+});
+['fType', 'fStatus'].forEach(id => $(id).onchange = renderList); $('fText').oninput = renderList;
+$('listToggle').onclick = () => { $('listwrap').classList.toggle('closed'); $('listToggle').textContent = $('listwrap').classList.contains('closed') ? '▸' : '▾'; };
+$('lresize').onpointerdown = e => {
+  const move = ev => document.documentElement.style.setProperty('--list-h', Math.min(innerHeight - 200, Math.max(90, innerHeight - ev.clientY)) + 'px');
+  const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); }; addEventListener('pointermove', move); addEventListener('pointerup', up);
+};
+$('xlsBtn').onclick = async () => {
+  try { if (!window.XLSX) await loadScript('lib/xlsx.full.min.js'); } catch (e) { return toast(e.message); }
+  const all = rows(), wb = XLSX.utils.book_new();
+  const a = [['Page', 'Type', 'Value / text', 'Measured', 'Unit', 'Perimeter (mm)', 'Scale', 'Comment', 'Status', 'Author', 'Date']];
+  for (const r of all) {
+    const M = measure(r.m, pages[r.i]), unit = r.m.t === 'len' ? 'mm' : r.m.t === 'area' ? 'm²' : r.m.t === 'count' ? 'items' : '';
+    a.push([r.page, r.type, M ? M.label : r.value, M ? (r.m.t === 'area' ? +(M.value / 1e6).toFixed(3) : Math.round(M.value)) : '', unit, M && M.perim ? Math.round(M.perim) : '', M ? calOf(pages[r.i]).label : '', r.m.comment || '', r.m.status || '', r.m.author || '', r.m.date ? new Date(r.m.date).toLocaleDateString('en-AU') : '']);
+  }
+  const ws = XLSX.utils.aoa_to_sheet(a); ws['!cols'] = [6, 11, 36, 11, 7, 13, 10, 36, 11, 16, 11].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws, 'Markups');
+  download(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }), baseName() + ' - markups.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+};
+
+/* =================== find text =================== */
+const textCache = new Map();
+function openFind() { if (!pages.length) return; $('findBox').hidden = false; $('findIn').focus(); $('findIn').select(); }
+$('findBtn').onclick = openFind; $('findClose').onclick = () => { $('findBox').hidden = true; pageDivs.forEach(d => d.querySelectorAll('.hit').forEach(x => x.remove())); };
+$('findIn').addEventListener('keydown', async e => {
+  if (e.key !== 'Enter') return; const q = $('findIn').value.trim().toLowerCase(); if (!q) return;
+  $('findInfo').textContent = 'Searching…'; const hits = [];
+  for (let i = 0; i < pages.length; i++) {
+    const pg = pages[i]; let items = textCache.get(pg.id);
+    if (!items) { const { pp, vp0 } = await pageInfo(pg), tc = await pp.getTextContent(); items = tc.items.filter(t => t.str).map(t => { const [x, y] = vp0.convertToViewportPoint(t.transform[4], t.transform[5]); const h = Math.hypot(t.transform[2], t.transform[3]); return { s: t.str, x, y, w: t.width, h }; }); textCache.set(pg.id, items); }
+    items.forEach(t => { if (t.s.toLowerCase().includes(q)) hits.push({ i, t }); });
+  }
+  $('findInfo').textContent = hits.length ? `${hits.length} found` : 'Not found (scanned drawings have no text)';
+  $('findRes').innerHTML = hits.slice(0, 300).map((h, k) => `<button data-k="${k}"><b>p${h.i + 1}</b> ${esc(h.t.s.slice(0, 80))}</button>`).join('');
+  $('findRes').onclick = ev => { const b = ev.target.closest('[data-k]'); if (!b) return; const h = hits[+b.dataset.k], div = pageDivs[h.i], g = div.querySelector('.rot');
+    pageDivs.forEach(d => d.querySelectorAll('.hit').forEach(x => x.remove()));
+    div.querySelector('.ui').insertAdjacentHTML('beforeend', `<rect class="hit" x="${h.t.x - 2}" y="${h.t.y - h.t.h - 1}" width="${h.t.w + 4}" height="${h.t.h + 4}" fill="#ffe600" fill-opacity="0.45" stroke="#e0661b" stroke-width="${1.5 / zoom}"/>`);
+    const q2 = new DOMPoint(h.t.x, h.t.y).matrixTransform(g.getScreenCTM()), st = $('stage'), sr = st.getBoundingClientRect();
+    st.scrollBy({ left: q2.x - sr.left - st.clientWidth / 2, top: q2.y - sr.top - st.clientHeight / 2, behavior: 'smooth' }); setActive(h.i); };
+});
+
+/* =================== saving: annotations (editable) or flattened =================== */
+// Each markup gets an appearance drawn in page-view coordinates; its /Matrix maps that view back to PDF user space,
+// so rotated pages and offset crop boxes come out right. Editable = standard annotations (+ /GPMark to reopen here);
+// flattened = the same appearances painted into the page content.
+const baseName = () => { const n = pages.length ? sources.get(pages[0].src).name : 'markup'; return n.replace(/\.pdf$/i, ''); };
+// On a tablet or phone the share sheet is offered first (iPad: Save to Files, Mail, ...); otherwise a normal download.
+async function download(bytes, name, type = 'application/pdf') {
+  const blob = new Blob([bytes], { type });
+  if (matchMedia('(pointer:coarse)').matches && navigator.canShare) {
+    const file = new File([blob], name, { type });
+    if (navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+function invert([a, b, c, d, e, f]) { const det = a * d - b * c; return [d / det, -b / det, -c / det, a / det, (c * f - d * e) / det, (b * e - a * f) / det]; }
+async function exportPdf(flatten) {
+  $('saveMenu').hidden = true;
+  try {
+    busy(flatten ? 'Flattening…' : 'Saving…'); await ensurePdfLib(); await tick();
+    const { PDFDocument, PDFName, PDFHexString, PDFString, PDFArray, degrees } = PDFLib;
+    const out = await PDFDocument.create(), docs = new Map();
+    for (const pg of pages) if (!docs.has(pg.src)) docs.set(pg.src, await PDFDocument.load(sources.get(pg.src).bytes, { ignoreEncryption: true }));
+    for (const pg of pages) { const [cp] = await out.copyPages(docs.get(pg.src), [pg.idx]); cp.setRotation(degrees((cp.getRotation().angle + pg.rot) % 360)); out.addPage(cp); }
+    const ctx = out.context;
+    const helv = ctx.register(ctx.obj({ Type: 'Font', Subtype: 'Type1', BaseFont: 'Helvetica', Encoding: 'WinAnsiEncoding' }));
+    const helvB = ctx.register(ctx.obj({ Type: 'Font', Subtype: 'Type1', BaseFont: 'Helvetica-Bold', Encoding: 'WinAnsiEncoding' }));
+    const gsFill = ctx.register(ctx.obj({ Type: 'ExtGState', ca: 0.2 })), gsArea = ctx.register(ctx.obj({ Type: 'ExtGState', ca: 0.15 })), gsHl = ctx.register(ctx.obj({ Type: 'ExtGState', CA: 0.4 })), gsStamp = ctx.register(ctx.obj({ Type: 'ExtGState', ca: 0.85 }));
+    const WIN = { '–': 0x96, '—': 0x97, '‘': 0x91, '’': 0x92, '“': 0x93, '”': 0x94, '•': 0x95, '…': 0x85, '€': 0x80, '²': 0xB2, '·': 0xB7 };
+    const hex = s => '<' + [...String(s)].map(ch => { const c = ch.charCodeAt(0); return (c < 256 ? c : WIN[ch] || 63).toString(16).padStart(2, '0'); }).join('') + '>';
+    const rgb = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255].map(v => +v.toFixed(3)); };
+    const n = v => +(+v).toFixed(3), P = pts => pts.map((p, i) => `${n(p[0])} ${n(p[1])} ${i ? 'l' : 'm'}`).join(' ');
+    const ell = (cx, cy, rx, ry) => { const k = 0.5523; return `${n(cx + rx)} ${n(cy)} m ${n(cx + rx)} ${n(cy + ry * k)} ${n(cx + rx * k)} ${n(cy + ry)} ${n(cx)} ${n(cy + ry)} c ${n(cx - rx * k)} ${n(cy + ry)} ${n(cx - rx)} ${n(cy + ry * k)} ${n(cx - rx)} ${n(cy)} c ${n(cx - rx)} ${n(cy - ry * k)} ${n(cx - rx * k)} ${n(cy - ry)} ${n(cx)} ${n(cy - ry)} c ${n(cx + rx * k)} ${n(cy - ry)} ${n(cx + rx)} ${n(cy - ry * k)} ${n(cx + rx)} ${n(cy)} c h`; };
+    // text in a y-down view: flip each glyph upright; th = clockwise angle in degrees
+    const T = (s, x, y, fs, col, bold, th = 0, anchor = 'start') => {
+      const w = tw(s, fs, bold), r = th * Math.PI / 180, c = Math.cos(r), sn = Math.sin(r), off = anchor === 'middle' ? w / 2 : 0;
+      return `BT /${bold ? 'HB' : 'H'} ${n(fs)} Tf ${col.join(' ')} rg ${n(c)} ${n(sn)} ${n(sn)} ${n(-c)} ${n(x - c * off)} ${n(y - sn * off)} Tm ${hex(s)} Tj ET`;
+    };
+    const now = PDFString.fromDate(new Date());
+    for (let pi = 0; pi < pages.length; pi++) {
+      const pg = pages[pi]; if (!pg.marks.length) continue;
+      const page = out.getPage(pi), { vp0 } = await pageInfo(pg), M = invert(vp0.transform);
+      const U2 = ([x, y]) => [n(M[0] * x + M[2] * y + M[4]), n(M[1] * x + M[3] * y + M[5])]; // view → user space
+      const annots = [], forms = [];
+      for (const m of pg.marks) {
+        const col = rgb(m.c), w = n(m.w), b = markBBox(m), pad = m.w + 4;
+        const bbox = [b.x - pad, b.y - pad, b.x + b.w + pad, b.y + b.h + pad].map(n);
+        const cs = [[bbox[0], bbox[1]], [bbox[2], bbox[1]], [bbox[2], bbox[3]], [bbox[0], bbox[3]]].map(U2);
+        const rect = [Math.min(...cs.map(p => p[0])), Math.min(...cs.map(p => p[1])), Math.max(...cs.map(p => p[0])), Math.max(...cs.map(p => p[1]))].map(n);
+        const strk = `${col.join(' ')} RG ${w} w ${m.t === 'hl' ? 0 : 1} J 1 j`;
+        const res = { Font: { H: helv, HB: helvB }, ExtGState: { F: gsFill, A: gsArea, L: gsHl, S: gsStamp } };
+        const meas = measure(m, pg);
+        const d = { Type: 'Annot', Rect: rect, NM: PDFHexString.fromText('gp-' + m.id), M: now, T: PDFHexString.fromText(m.author || ''), F: 4, C: col,
+          Subj: PDFHexString.fromText(NAMES[m.t]), BS: { W: w, S: 'S' } };
+        const contents = m.t === 'text' || m.t === 'callout' || m.t === 'stamp' ? m.text : [meas ? meas.label + (meas.sub ? ' (' + meas.sub + ')' : '') : '', m.comment].filter(Boolean).join(' — ');
+        if (contents) d.Contents = PDFHexString.fromText(contents);
+        let ops = '';
+        switch (m.t) {
+          case 'pen': case 'hl': Object.assign(d, { Subtype: 'Ink', InkList: [m.pts.flatMap(U2)] }); ops = (m.t === 'hl' ? '/L gs ' : '') + `${strk} ${P(m.pts)} S`; break;
+          case 'line': Object.assign(d, { Subtype: 'Line', L: [...U2(m.pts[0]), ...U2(m.pts[1])] }); ops = `${strk} ${P(m.pts)} S`; break;
+          case 'arrow': { const a = arrowHead(m.pts[0], m.pts[1], m.w); Object.assign(d, { Subtype: 'Line', L: [...U2(m.pts[0]), ...U2(m.pts[1])], LE: ['None', 'ClosedArrow'], IC: col }); ops = `${strk} ${P([m.pts[0], a.end])} S ${col.join(' ')} rg ${P(a.tri)} h f`; break; }
+          case 'rect': case 'cloud': case 'ellipse': {
+            const bb = box2(m), shape = m.t === 'ellipse' ? ell(bb.x + bb.w / 2, bb.y + bb.h / 2, bb.w / 2, bb.h / 2) : m.t === 'cloud' ? P(cloudPts(m)) + ' h' : P([[bb.x, bb.y], [bb.x + bb.w, bb.y], [bb.x + bb.w, bb.y + bb.h], [bb.x, bb.y + bb.h]]) + ' h';
+            d.Subtype = m.t === 'ellipse' ? 'Circle' : 'Square'; if (m.fill) d.IC = col; if (m.t === 'cloud') d.BE = { S: 'C', I: 1 };
+            ops = (m.fill ? `q /F gs ${col.join(' ')} rg ${shape} f Q ` : '') + `${strk} ${shape} S`; break;
+          }
+          case 'text': { const t = textBlock(m); Object.assign(d, { Subtype: 'FreeText', DA: PDFString.of(`/Helv ${n(m.fs)} Tf ${col.join(' ')} rg`), BS: { W: 0 } }); ops = t.lines.map((l, i) => T(l, m.pts[0][0], m.pts[0][1] + m.fs * 0.8 + i * t.lh, m.fs, col)).join(' '); break; }
+          case 'callout': { const cb = calloutBox(m), a = arrowHead(m.pts[1], m.pts[0], m.w);
+            Object.assign(d, { Subtype: 'FreeText', IT: 'FreeTextCallout', DA: PDFString.of(`/Helv ${n(m.fs)} Tf ${col.join(' ')} rg`), CL: [...U2(m.pts[0]), ...U2(m.pts[1]), ...U2(m.pts[1])], LE: 'ClosedArrow', IC: [1, 1, 1] });
+            ops = `${strk} ${P([m.pts[1], a.end])} S ${col.join(' ')} rg ${P(a.tri)} h f 1 1 1 rg ${P([[cb.bx, cb.by], [cb.bx + cb.bw, cb.by], [cb.bx + cb.bw, cb.by + cb.bh], [cb.bx, cb.by + cb.bh]])} h B ` +
+              cb.t.lines.map((l, i) => T(l, cb.bx + cb.pad, cb.by + cb.pad + m.fs * 0.8 + i * cb.t.lh, m.fs, col)).join(' '); break; }
+          case 'stamp': { const L = stampLayout(m); Object.assign(d, { Subtype: 'Stamp', Name: 'Draft' }); delete d.BS;
+            const rr = Math.min(m.fs * 0.5, L.h / 2), R = [[L.x, L.y], [L.x + L.w, L.y], [L.x + L.w, L.y + L.h], [L.x, L.y + L.h]];
+            ops = `q /S gs 1 1 1 rg ${P(R)} h f Q ${col.join(' ')} RG ${n(Math.max(1.5, m.w))} w 1 j ${P(R)} h S ` + T(m.text, L.tx, L.ty, L.big, col, true, 0, 'middle') + (L.sub ? ' ' + T(L.sub, L.tx, L.sy, L.small, col, false, 0, 'middle') : ''); void rr; break; }
+          case 'len': { const g = lenLabel(m, pg); Object.assign(d, { Subtype: 'PolyLine', Vertices: m.pts.flatMap(U2), IT: 'PolyLineDimension' });
+            ops = `${strk} ${P(m.pts)} S ` + ticks(m).map(t => `${n(t[0])} ${n(t[1])} m ${n(t[2])} ${n(t[3])} l S`).join(' ') + ' ' + T(g.label, g.cx, g.cy, m.fs, col, true, g.deg, 'middle'); break; }
+          case 'area': { const [cx, cy] = centroid(m.pts); Object.assign(d, { Subtype: 'Polygon', Vertices: m.pts.flatMap(U2), IT: 'PolygonDimension', IC: col });
+            ops = `q /A gs ${col.join(' ')} rg ${P(m.pts)} h f Q ${strk} ${P(m.pts)} h S ` + T(meas.label, cx, cy, m.fs, col, true, 0, 'middle'); break; }
+          case 'count': { const r = countR(m); Object.assign(d, { Subtype: 'Stamp', Name: 'Count' }); delete d.BS;
+            ops = m.pts.map((p, k) => `${col.join(' ')} rg 1 1 1 RG 1 w ${ell(p[0], p[1], r, r)} B ` + T(String(k + 1), p[0], p[1] + r * 0.4, r * 1.1, [1, 1, 1], true, 0, 'middle')).join(' '); break; }
+          default: continue;
+        }
+        const form = ctx.register(ctx.stream(ops, { Type: 'XObject', Subtype: 'Form', BBox: bbox, Matrix: M.map(n), Resources: res }));
+        if (flatten) { forms.push(form); continue; }
+        d.AP = { N: form };
+        const data = { ...m, pts: m.pts.map(U2) }; if (MEASURE.includes(m.t) && pg.cal) data.cal = pg.cal;
+        d.GPMark = PDFHexString.fromText(JSON.stringify(data));
+        annots.push(ctx.register(ctx.obj(d)));
+      }
+      if (flatten && forms.length) {
+        page.node.normalize();
+        let ops = '';
+        forms.forEach((f, k) => { const nm = 'GPm' + k; page.node.setXObject(PDFName.of(nm), f); ops += `q /${nm} Do Q\n`; });
+        const C = page.node.get(PDFName.of('Contents')), old = C instanceof PDFArray ? C.asArray() : C ? [C] : [];
+        page.node.set(PDFName.of('Contents'), ctx.obj([ctx.register(ctx.stream('q\n')), ...old, ctx.register(ctx.stream('\nQ\n')), ctx.register(ctx.stream(ops))]));
+      }
+      if (annots.length) {
+        const ex = page.node.lookup(PDFName.of('Annots'));
+        page.node.set(PDFName.of('Annots'), ctx.obj([...(ex instanceof PDFArray ? ex.asArray() : []), ...annots]));
+      }
+    }
+    const bytes = await out.save();
+    busy('');
+    download(bytes, `${baseName()} (${flatten ? 'flattened' : 'marked up'}).pdf`);
+    toast(flatten ? 'Flattened PDF saved' : 'PDF saved. Markups stay editable in Bluebeam / Acrobat, and here if you reopen it.');
+  } catch (e) { busy(''); console.error(e); alert('Could not save the PDF: ' + e.message); }
+}
+$('saveBtn').onclick = () => exportPdf(false);
+$('saveMore').onclick = e => { e.stopPropagation(); $('saveMenu').hidden = !$('saveMenu').hidden; };
+$('saveMenu').onclick = e => { const b = e.target.closest('[data-save]'); if (b) exportPdf(b.dataset.save === 'flat'); };
+document.addEventListener('click', e => {
+  if (!e.target.closest('#saveMore, #saveMenu')) $('saveMenu').hidden = true;
+  if (!e.target.closest('#clearBtn, #clearMenu')) $('clearMenu').hidden = true;
+});
+
+/* =================== clear =================== */
+$('clearBtn').onclick = e => { e.stopPropagation(); $('clearMenu').hidden = !$('clearMenu').hidden; };
+$('clearMenu').onclick = e => {
+  const b = e.target.closest('[data-clear]'); if (!b) return;
+  $('clearMenu').hidden = true;
+  if (drawing) finishDrawing();
+  const marks = pages.reduce((s, p) => s + p.marks.length, 0);
+  if (b.dataset.clear === 'marks') {
+    if (!marks) return toast('No markups to clear');
+    if (!confirm(`Clear all ${marks} markups? Undo (Ctrl+Z) brings them back.`)) return;
+    checkpoint(); pages.forEach(p => { p.marks = []; }); sel = null;
+    layout(); renderThumbs(); saveState(); toast(`Cleared ${marks} markups`);
+  } else {
+    if (!confirm(`Close the PDF${marks ? ` and its ${marks} markups` : ''}? This can't be undone - save first if you need it.`)) return;
+    clearTimeout(saveT);
+    pages = []; sources.clear(); pdfPages.clear(); textCache.clear(); hist = []; fut = []; sel = null; active = 0; syncUndo();
+    $('findBox').hidden = true;
+    layout(); renderThumbs();
+    idbPut('state', { pages: [], srcs: [] }); idbPut('bytes', []);
+    toast('Cleared');
+  }
+};
+
+/* =================== open / drop / misc =================== */
+let fileMode = 'open';
+$('openBtn').onclick = () => { fileMode = 'open'; $('fileIn').click(); };
+$('addBtn').onclick = () => { fileMode = 'insert'; $('fileIn').click(); };
+$('fileIn').onchange = async e => { const fs = [...e.target.files]; e.target.value = ''; await openOrInsert(fs, fileMode); };
+async function openOrInsert(files, mode) {
+  if (mode === 'open' && pages.length) {
+    const marks = pages.reduce((s, p) => s + p.marks.length, 0);
+    if (marks && !confirm(`Close the current document (${marks} markups)? Save it first if you need it.`)) return;
+    pages = []; sources.clear(); pdfPages.clear(); textCache.clear(); hist = []; fut = []; sel = null; syncUndo();
+  }
+  await addFiles(files, mode === 'insert' ? active + 1 : pages.length);
+  setTimeout(() => fit('width'), 30);
+}
+addEventListener('dragover', e => { if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); $('stage').classList.add('dragging'); } });
+addEventListener('dragleave', e => { if (!e.relatedTarget) $('stage').classList.remove('dragging'); });
+addEventListener('drop', e => { if (![...e.dataTransfer.types].includes('Files')) return; e.preventDefault(); $('stage').classList.remove('dragging'); openOrInsert([...e.dataTransfer.files], pages.length ? 'insert' : 'open'); });
+$('author').value = store.get('pm:author', ''); $('author').onchange = () => store.set('pm:author', $('author').value.trim());
+$('themeBtn').onclick = () => { const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; r.dataset.theme = dark ? 'light' : 'dark'; try { localStorage.setItem('claudeToolsTheme', r.dataset.theme); } catch {} };
+try { const t = localStorage.getItem('claudeToolsTheme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+setTool('select'); syncZoom(); syncScale(); syncUndo(); renderList();
+restore();
+window.__pm = { get pages() { return pages; }, sources, addFiles, exportPdf, setTool, measure, get zoom() { return zoom; }, finishDrawing };
+</script>
+<script>
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+let installEvt = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; document.getElementById('installBtn').hidden = false; });
+document.getElementById('installBtn').onclick = async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; document.getElementById('installBtn').hidden = true; };
+addEventListener('appinstalled', () => { document.getElementById('installBtn').hidden = true; });
+</script>
+</body>
+</html>
