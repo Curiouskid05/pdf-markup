@@ -149,13 +149,7 @@ body{padding-bottom:env(safe-area-inset-bottom)}
   <h1>PDF <span>Markup</span></h1>
   <button class="primary" id="openBtn" title="Open PDFs (replaces what's open)">Open…</button>
   <button id="addBtn" title="Insert PDFs after the current page" disabled>Insert PDF…</button>
-  <span class="split">
-    <button id="clearBtn" title="Clear markups or close the PDF" disabled>Clear ▾</button>
-    <div class="menu" id="clearMenu" style="left:0;right:auto" hidden>
-      <button data-clear="marks"><b>Clear all markups</b><small>Removes every markup and measurement, keeps the PDF open. Undo (Ctrl+Z) brings them back.</small></button>
-      <button data-clear="all"><b>Close PDF and clear everything</b><small>Closes the document and forgets the saved session. Save first if you need it.</small></button>
-    </div>
-  </span>
+  <button id="clearBtn" title="Save a PDF with your markups, then close all PDFs" disabled>Save &amp; close all</button>
   <input type="file" id="fileIn" accept=".pdf,application/pdf" multiple hidden>
   <span class="muted" id="docName"></span>
   <span class="grow"></span>
@@ -1033,10 +1027,11 @@ async function download(bytes, name, type = 'application/pdf') {
   if (matchMedia('(pointer:coarse)').matches && navigator.canShare) {
     const file = new File([blob], name, { type });
     if (navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file] }); return; } catch (e) { if (e.name === 'AbortError') return; }
+      try { await navigator.share({ files: [file] }); return true; } catch (e) { if (e.name === 'AbortError') return false; }
     }
   }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  return true;
 }
 function invert([a, b, c, d, e, f]) { const det = a * d - b * c; return [d / det, -b / det, -c / det, a / det, (c * f - d * e) / det, (b * e - a * f) / det]; }
 async function exportPdf(flatten) {
@@ -1126,39 +1121,33 @@ async function exportPdf(flatten) {
     }
     const bytes = await out.save();
     busy('');
-    download(bytes, `${baseName()} (${flatten ? 'flattened' : 'marked up'}).pdf`);
+    if (!await download(bytes, `${baseName()} (${flatten ? 'flattened' : 'marked up'}).pdf`)) return false;
     toast(flatten ? 'Flattened PDF saved' : 'PDF saved. Markups stay editable in Bluebeam / Acrobat, and here if you reopen it.');
-  } catch (e) { busy(''); console.error(e); alert('Could not save the PDF: ' + e.message); }
+    return true;
+  } catch (e) { busy(''); console.error(e); alert('Could not save the PDF: ' + e.message); return false; }
 }
 $('saveBtn').onclick = () => exportPdf(false);
 $('saveMore').onclick = e => { e.stopPropagation(); $('saveMenu').hidden = !$('saveMenu').hidden; };
 $('saveMenu').onclick = e => { const b = e.target.closest('[data-save]'); if (b) exportPdf(b.dataset.save === 'flat'); };
 document.addEventListener('click', e => {
   if (!e.target.closest('#saveMore, #saveMenu')) $('saveMenu').hidden = true;
-  if (!e.target.closest('#clearBtn, #clearMenu')) $('clearMenu').hidden = true;
 });
 
-/* =================== clear =================== */
-$('clearBtn').onclick = e => { e.stopPropagation(); $('clearMenu').hidden = !$('clearMenu').hidden; };
-$('clearMenu').onclick = e => {
-  const b = e.target.closest('[data-clear]'); if (!b) return;
-  $('clearMenu').hidden = true;
+/* =================== save & close all =================== */
+// Saves the marked-up PDF first; everything stays open if the save fails or is cancelled.
+$('clearBtn').onclick = async () => {
   if (drawing) finishDrawing();
   const marks = pages.reduce((s, p) => s + p.marks.length, 0);
-  if (b.dataset.clear === 'marks') {
-    if (!marks) return toast('No markups to clear');
-    if (!confirm(`Clear all ${marks} markups? Undo (Ctrl+Z) brings them back.`)) return;
-    checkpoint(); pages.forEach(p => { p.marks = []; }); sel = null;
-    layout(); renderThumbs(); saveState(); toast(`Cleared ${marks} markups`);
-  } else {
-    if (!confirm(`Close the PDF${marks ? ` and its ${marks} markups` : ''}? This can't be undone - save first if you need it.`)) return;
-    clearTimeout(saveT);
-    pages = []; sources.clear(); pdfPages.clear(); textCache.clear(); hist = []; fut = []; sel = null; active = 0; syncUndo();
-    $('findBox').hidden = true;
-    layout(); renderThumbs();
-    idbPut('state', { pages: [], srcs: [] }); idbPut('bytes', []);
-    toast('Cleared');
-  }
+  if (marks) {
+    if (!confirm(`Save a PDF with the ${marks} markup${marks > 1 ? 's' : ''}, then close all PDFs?`)) return;
+    if (!await exportPdf(false)) return;
+  } else if (!confirm('No markups to save. Close all PDFs?')) return;
+  clearTimeout(saveT);
+  pages = []; sources.clear(); pdfPages.clear(); textCache.clear(); hist = []; fut = []; sel = null; active = 0; syncUndo();
+  $('findBox').hidden = true;
+  layout(); renderThumbs();
+  idbPut('state', { pages: [], srcs: [] }); idbPut('bytes', []);
+  toast(marks ? 'Saved and closed' : 'Closed');
 };
 
 /* =================== open / drop / misc =================== */
